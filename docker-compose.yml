@@ -1,0 +1,30 @@
+services:
+  altcha-server:
+    build: .
+    container_name: altcha-service
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      - redis
+    networks:
+      - altcha-net
+      - nginxpm_default
+
+  redis:
+    image: redis:alpine
+    container_name: redis-service
+    command: >
+      --maxmemory 256mb  --maxmemory-policy allkeys-lru
+    restart: always
+    networks:
+      - altcha-net
+
+networks:
+  altcha-net:
+    name: altcha-net
+    driver: bridge
+  nginxpm_default:
+    external: true
