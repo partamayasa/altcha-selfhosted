@@ -3,12 +3,14 @@ services:
     build: .
     container_name: altcha-service
     ports:
-      - "3000:3000"
+      - "3001:3000"
     env_file:
       - .env
     restart: always
     depends_on:
       - redis
+    volumes:
+      - ./whitelist.json:/app/whitelist.json:ro
     networks:
       - altcha-net
       - nginxpm_default

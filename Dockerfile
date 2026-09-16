@@ -7,6 +7,7 @@ COPY package.json ./
 RUN npm install --production
 
 COPY server.js .
+COPY whitelist.json* ./
 
 EXPOSE 3000
 
