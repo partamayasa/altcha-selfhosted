@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALTCHA Manager - Bot Mitigation & Security Dashboard</title>
+  <meta name="description" content="Self-hosted ALTCHA Manager (ALTCHA Man) dashboard with AdminLTE design for bot protection, rate limiting, and audit logs.">
+  <link rel="icon" type="image/png" href="./assets/logo.png">
+  <link rel="shortcut icon" href="./assets/logo.png">
+  <link rel="apple-touch-icon" href="./assets/logo.png">
+  
+  <!-- Google Font: Source Sans Pro (AdminLTE Official Font) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  
+  <!-- Official AdminLTE v3.2.0 Stylesheet (ColorlibHQ/AdminLTE) -->
+  <link rel="stylesheet" href="./css/adminlte.min.css">
+  <link rel="stylesheet" href="./css/sentinel.css">
+  
+  <!-- Load Altcha Web Component -->
+  <script type="module" src="./altcha.min.js"></script>
+</head>
+<body class="hold-transition sidebar-mini layout-fixed dark-mode">
+
+  <div class="wrapper">
+    <!-- Top Navbar -->
+    <nav class="main-header navbar navbar-expand">
+      <!-- Left navbar links -->
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" data-widget="pushmenu" id="pushmenu-btn" href="#" role="button" title="Toggle Sidebar">
+            <i class="fas fa-bars"></i>
+          </a>
+        </li>
+        <li class="nav-item d-none d-sm-inline-block">
+          <a class="nav-link" onclick="SentinelApp.switchTab('dashboard')">Home</a>
+        </li>
+        <li class="nav-item d-none d-sm-inline-block">
+          <a class="nav-link" onclick="SentinelApp.switchTab('playground')">Playground</a>
+        </li>
+      </ul>
+
+      <!-- Right navbar links -->
+      <ul class="navbar-nav ml-auto" style="margin-left:auto;">
+        <!-- Auto Refresh Selector -->
+        <li class="nav-item">
+          <div style="display:flex;align-items:center;background:rgba(0,0,0,0.06);border-radius:4px;padding:2px 6px;">
+            <i class="fas fa-sync-alt" style="font-size:0.85rem;margin-right:6px;opacity:0.7;"></i>
+            <select id="global-refresh-interval" class="form-control" style="height:28px;padding:2px 8px;font-size:0.8rem;border:none;background:transparent;width:auto;cursor:pointer;">
+              <option value="0">Auto: Off</option>
+              <option value="3">Auto: 3s</option>
+              <option value="5">Auto: 5s</option>
+              <option value="10" selected>Auto: 10s</option>
+              <option value="30">Auto: 30s</option>
+            </select>
+          </div>
+        </li>
+
+        <!-- Manual Refresh Button -->
+        <li class="nav-item">
+          <a class="nav-link" id="manual-refresh-btn" role="button" title="Refresh Data">
+            <i class="fas fa-redo"></i>
+          </a>
+        </li>
+
+        <!-- Theme Toggle Button -->
+        <li class="nav-item">
+          <a class="nav-link" id="theme-toggle-btn" role="button" title="Toggle Dark/Light Mode">
+            <i class="fas fa-sun" id="theme-icon"></i>
+          </a>
+        </li>
+      </ul>
+    </nav>
+
+    <!-- Main Sidebar Container -->
+    <aside class="main-sidebar sidebar-dark-primary elevation-4">
+      <!-- Brand Logo -->
+      <a class="brand-link" onclick="SentinelApp.switchTab('dashboard')" style="cursor:pointer;" title="ALTCHA Manager (ALTCHA Man)">
+        <img src="./assets/logo.png" alt="ALTCHA Manager Logo" class="brand-image" />
+        <span class="brand-text">ALTCHA <strong>Manager</strong></span>
+      </a>
+
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <!-- Sidebar Menu -->
+        <nav class="mt-2">
+          <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+            <li class="nav-header">MONITORING</li>
+
+            <li class="nav-item">
+              <a class="nav-link active" data-tab="dashboard">
+                <i class="nav-icon fas fa-tachometer-alt"></i>
+                <p>Overview & Stats</p>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" data-tab="logs">
+                <i class="nav-icon fas fa-file-alt"></i>
+                <p>
+                  Audit Logs
+                  <span class="badge badge-info right" id="sidebar-log-pill">Live</span>
+                </p>
+              </a>
+            </li>
+
+            <li class="nav-header">SECURITY & RULES</li>
+
+            <li class="nav-item">
+              <a class="nav-link" data-tab="whitelist">
+                <i class="nav-icon fas fa-shield-alt"></i>
+                <p>Security Whitelist</p>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" data-tab="settings">
+                <i class="nav-icon fas fa-cogs"></i>
+                <p>PoW Engine Policy</p>
+              </a>
+            </li>
+
+            <li class="nav-header">DEVELOPER</li>
+
+            <li class="nav-item">
+              <a class="nav-link" data-tab="playground">
+                <i class="nav-icon fas fa-play-circle"></i>
+                <p>Playground & Snippets</p>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- Content Wrapper -->
+    <div class="content-wrapper">
+      <!-- Content Header (Page header) -->
+      <div class="content-header">
+        <div class="content-header-container">
+          <div>
+            <h1 class="content-title">
+              <span id="header-title">Overview & Telemetry</span>
+              <small id="header-desc">ALTCHA Man v2.5</small>
+            </h1>
+          </div>
+          <div>
+            <ol class="breadcrumb" id="header-breadcrumb">
+              <li class="breadcrumb-item"><a href="#" onclick="SentinelApp.switchTab('dashboard')"><i class="fas fa-home"></i> Home</a></li>
+              <li class="breadcrumb-item active" id="breadcrumb-current">Dashboard</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main content -->
+      <div class="content">
+
+        <!-- TAB 1: DASHBOARD / OVERVIEW -->
+        <section class="tab-pane active" id="tab-dashboard">
+          <!-- Small Boxes (Stat card row) -->
+          <div class="row">
+            <div class="col-lg-2 col-md-4 col-6">
+              <div class="small-box bg-info">
+                <div class="inner">
+                  <h3 id="metric-total-requests">0</h3>
+                  <p>Total Requests</p>
+                </div>
+                <div class="icon">
+                  <i class="fas fa-chart-line"></i>
+                </div>
+                <a class="small-box-footer" onclick="SentinelApp.switchTab('logs')" style="cursor:pointer;">
+                  View Logs <i class="fas fa-arrow-circle-right"></i>
+                </a>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+              <div class="small-box bg-primary">
+                <div class="inner">
+                  <h3 id="metric-challenges">0</h3>
+                  <p>Challenges (PoW)</p>
+                </div>
+                <div class="icon">
+                  <i class="fas fa-cube"></i>
+                </div>
+                <a class="small-box-footer" onclick="SentinelApp.switchTab('playground')" style="cursor:pointer;">
+                  Test Challenge <i class="fas fa-arrow-circle-right"></i>
+                </a>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+              <div class="small-box bg-success">
+                <div class="inner">
+                  <h3 id="metric-verifications">0</h3>
+                  <p>Verified Submissions</p>
+                </div>
+                <div class="icon">
+                  <i class="fas fa-check-circle"></i>
+                </div>
+                <a class="small-box-footer" id="metric-success-rate">
+                  100% Success
+                </a>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+              <div class="small-box bg-warning">
+                <div class="inner">
+                  <h3 id="metric-blocked">0</h3>
+                  <p>Blocked (403)</p>
+                </div>
+                <div class="icon">
+                  <i class="fas fa-ban"></i>
+                </div>
+                <a class="small-box-footer" onclick="SentinelApp.switchTab('whitelist')" style="cursor:pointer;">
+                  Whitelist Rules <i class="fas fa-arrow-circle-right"></i>
+                </a>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+              <div class="small-box bg-danger">
+                <div class="inner">
+                  <h3 id="metric-ratelimited">0</h3>
+                  <p>Rate-Limited (429)</p>
+                </div>
+                <div class="icon">
+                  <i class="fas fa-stopwatch"></i>
+                </div>
+                <a class="small-box-footer" onclick="SentinelApp.switchTab('settings')" style="cursor:pointer;">
+                  Rate Limits <i class="fas fa-arrow-circle-right"></i>
+                </a>
+              </div>
+            </div>
+
+            <div class="col-lg-2 col-md-4 col-6">
+              <div class="small-box bg-purple">
+                <div class="inner">
+                  <h3 id="metric-latency">0 ms</h3>
+                  <p>Avg Latency</p>
+                </div>
+                <div class="icon">
+                  <i class="fas fa-bolt"></i>
+                </div>
+                <span class="small-box-footer">
+                  Execution Speed
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Charts and Telemetry Row -->
+          <div class="row">
+            <!-- Left: Hourly Activity Chart Card -->
+            <div class="col-lg-8">
+              <div class="card card-outline card-primary">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-chart-bar"></i> Hourly Request Activity (UTC)
+                  </h3>
+                  <div class="card-tools">
+                    <select class="form-control" id="dashboard-date-filter" style="height:32px;font-size:0.85rem;padding:2px 8px;" onchange="SentinelDashboard.refresh()">
+                      <!-- Dynamically populated -->
+                    </select>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="chart-container" id="hourly-activity-chart">
+                    <!-- Bars -->
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right: Telemetry Info Boxes -->
+            <div class="col-lg-4">
+              <div class="card card-outline card-info">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-server"></i> Node.js Server Telemetry
+                  </h3>
+                </div>
+                <div class="card-body" style="padding-bottom:0.5rem;">
+                  <!-- Info Box 1 -->
+                  <div class="info-box">
+                    <span class="info-box-icon bg-info"><i class="fas fa-clock"></i></span>
+                    <div class="info-box-content">
+                      <span class="info-box-text">Server Uptime</span>
+                      <span class="info-box-number" id="telemetry-uptime">-</span>
+                    </div>
+                  </div>
+
+                  <!-- Info Box 2 -->
+                  <div class="info-box">
+                    <span class="info-box-icon bg-success"><i class="fas fa-memory"></i></span>
+                    <div class="info-box-content">
+                      <span class="info-box-text">RAM Usage</span>
+                      <span class="info-box-number" id="telemetry-memory" style="font-size:1.05rem;">-</span>
+                    </div>
+                  </div>
+
+                  <!-- Info Box 3 -->
+                  <div class="info-box">
+                    <span class="info-box-icon bg-warning"><i class="fas fa-database"></i></span>
+                    <div class="info-box-content">
+                      <span class="info-box-text">Redis Anti-Replay</span>
+                      <span class="info-box-number" id="telemetry-redis">-</span>
+                    </div>
+                  </div>
+
+                  <!-- Info Box 4 -->
+                  <div class="info-box">
+                    <span class="info-box-icon bg-danger"><i class="fas fa-shield-virus"></i></span>
+                    <div class="info-box-content">
+                      <span class="info-box-text">Rate Limiter</span>
+                      <span class="info-box-number" id="telemetry-ratelimit" style="font-size:0.95rem;">-</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Origins and IPs Tables Row -->
+          <div class="row">
+            <div class="col-lg-6">
+              <div class="card card-outline card-secondary">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="fas fa-globe"></i> Top Origin Domains</h3>
+                </div>
+                <div class="card-body p-0">
+                  <div id="top-origins-list" style="padding:15px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-lg-6">
+              <div class="card card-outline card-secondary">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="fas fa-network-wired"></i> Top Client IP Addresses</h3>
+                </div>
+                <div class="card-body p-0">
+                  <div id="top-ips-list" style="padding:15px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: AUDIT & TRAFFIC LOGS -->
+        <section class="tab-pane" id="tab-logs">
+          <div class="card card-outline card-success">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-list-alt"></i> Audit & Traffic Logs Table
+              </h3>
+              <div class="card-tools">
+                <button class="btn btn-default btn-sm" onclick="SentinelLogs.exportCSV()">
+                  <i class="fas fa-file-export"></i> Export CSV
+                </button>
+                <button class="btn btn-default btn-sm" onclick="SentinelLogs.refresh()">
+                  <i class="fas fa-sync-alt"></i> Refresh
+                </button>
+              </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="card-body border-bottom" style="padding:12px 20px;background:rgba(0,0,0,0.02);">
+              <div class="row" style="align-items:center;">
+                <div class="col-md-3 mb-2">
+                  <select class="form-control" id="logs-date-filter" onchange="SentinelLogs.refresh()">
+                    <!-- Dates -->
+                  </select>
+                </div>
+                <div class="col-md-3 mb-2">
+                  <select class="form-control" id="logs-status-filter" onchange="SentinelLogs.refresh()">
+                    <option value="">All HTTP Statuses</option>
+                    <option value="200">200 (OK)</option>
+                    <option value="204">204 (Options)</option>
+                    <option value="403">403 (Blocked)</option>
+                    <option value="429">429 (Rate Limit)</option>
+                    <option value="500">500 (Error)</option>
+                  </select>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <div class="input-group">
+                    <input type="text" class="form-control" id="logs-search-input" placeholder="Search IP, URL, or Origin..." oninput="SentinelLogs.refresh()">
+                    <div class="input-group-append">
+                      <span class="btn btn-default"><i class="fas fa-search"></i></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Table -->
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-bordered table-striped table-hover">
+                  <thead>
+                    <tr>
+                      <th style="width:110px;">Time (UTC)</th>
+                      <th>Client IP</th>
+                      <th>Target Endpoint</th>
+                      <th style="width:90px;">Status</th>
+                      <th style="width:90px;">Duration</th>
+                      <th>Origin Header</th>
+                      <th style="width:80px;">Result</th>
+                    </tr>
+                  </thead>
+                  <tbody id="logs-table-body">
+                    <!-- Logs dynamically populated -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- Footer Pagination -->
+            <div class="card-footer" style="display:flex;align-items:center;justify-content:space-between;">
+              <span id="logs-pagination-info" style="font-size:0.88rem;color:#6c757d;">Showing 0 of 0 entries</span>
+              <div>
+                <button class="btn btn-default btn-sm" id="logs-prev-btn" onclick="SentinelLogs.prevPage()">
+                  <i class="fas fa-chevron-left"></i> Previous
+                </button>
+                <button class="btn btn-default btn-sm" id="logs-next-btn" onclick="SentinelLogs.nextPage()">
+                  Next <i class="fas fa-chevron-right"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: SECURITY WHITELIST -->
+        <section class="tab-pane" id="tab-whitelist">
+          <div class="row">
+            <!-- Policy Controls -->
+            <div class="col-lg-6">
+              <div class="card card-outline card-warning">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-user-shield"></i> Whitelist Enforcement Policy
+                  </h3>
+                  <div class="card-tools">
+                    <span class="badge badge-success" id="whitelist-count-badge">0 Domains</span>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="callout callout-info">
+                    <h5><i class="fas fa-info-circle"></i> Whitelist Policy Info</h5>
+                    <p>By default, only challenge and verify requests with Origin/Referer matching the allowed domains below are permitted.</p>
+                  </div>
+
+                  <div class="form-group">
+                    <div class="custom-control custom-switch">
+                      <input type="checkbox" class="custom-control-input" id="whitelist-enabled-toggle">
+                      <label class="custom-control-label" for="whitelist-enabled-toggle">Enable Whitelist Enforcement</label>
+                    </div>
+                    <small class="text-muted d-block mt-1">If disabled, all websites and origins can access these endpoints without domain restrictions.</small>
+                  </div>
+
+                  <hr>
+
+                  <div class="form-group">
+                    <div class="custom-control custom-switch">
+                      <input type="checkbox" class="custom-control-input" id="whitelist-direct-toggle">
+                      <label class="custom-control-label" for="whitelist-direct-toggle">Allow Direct Access (No Origin/Referer)</label>
+                    </div>
+                    <small class="text-muted d-block mt-1">Allows server-side, mobile, or cURL requests that do not send Origin or Referer headers.</small>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Domain Matcher Card -->
+              <div class="card card-outline card-info">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-vial"></i> Test Domain Rule (Origin Matcher)
+                  </h3>
+                </div>
+                <div class="card-body">
+                  <label class="form-label">Enter Origin URL</label>
+                  <div class="input-group">
+                    <input type="text" class="form-control font-mono" id="test-origin-input" placeholder="e.g. https://app.example.com">
+                    <div class="input-group-append">
+                      <button class="btn btn-primary" onclick="SentinelWhitelist.testRule()">
+                        <i class="fas fa-check"></i> Test
+                      </button>
+                    </div>
+                  </div>
+                  <div id="test-origin-result" style="display:none;margin-top:12px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Domain Rules List -->
+            <div class="col-lg-6">
+              <div class="card card-outline card-primary">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-list"></i> Allowed Domain Rules
+                  </h3>
+                </div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <label class="form-label">Add New Domain Rule</label>
+                    <div class="input-group">
+                      <input type="text" class="form-control font-mono" id="new-domain-input" placeholder="https://sub.example.com or https://*.example.com">
+                      <div class="input-group-append">
+                        <button class="btn btn-success" onclick="SentinelWhitelist.addDomain()">
+                          <i class="fas fa-plus"></i> Add
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div id="whitelist-domains-list" style="margin-bottom:18px;">
+                    <!-- Domains list -->
+                  </div>
+                </div>
+                <div class="card-footer text-right" style="text-align:right;">
+                  <button class="btn btn-primary" onclick="SentinelWhitelist.save()">
+                    <i class="fas fa-save"></i> Save Changes to whitelist.json
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: POW ENGINE POLICY -->
+        <section class="tab-pane" id="tab-settings">
+          <div class="row">
+            <div class="col-lg-7">
+              <div class="card card-outline card-info">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-sliders-h"></i> Proof-of-Work (PoW) Engine Parameters
+                  </h3>
+                </div>
+                <div class="card-body p-0">
+                  <table class="table table-striped table-bordered">
+                    <tbody>
+                      <tr>
+                        <th style="width:40%;">Cryptographic Hash Algorithm</th>
+                        <td><span class="badge badge-primary" id="cfg-algorithm">-</span></td>
+                      </tr>
+                      <tr>
+                        <th>PoW Difficulty (Cost / Max Number)</th>
+                        <td><strong id="cfg-cost">-</strong></td>
+                      </tr>
+                      <tr>
+                        <th>Challenge Expiration Time (Expires In)</th>
+                        <td><span id="cfg-expires">-</span></td>
+                      </tr>
+                      <tr>
+                        <th>Rate Limit Maximum Requests</th>
+                        <td><span class="badge badge-danger" id="cfg-ratelimit-max">-</span></td>
+                      </tr>
+                      <tr>
+                        <th>Rate Limit Window Duration</th>
+                        <td><span id="cfg-ratelimit-window">-</span></td>
+                      </tr>
+                      <tr>
+                        <th>Anti-Replay Cache Storage</th>
+                        <td><span id="cfg-redis-status">-</span></td>
+                      </tr>
+                      <tr>
+                        <th>Trust Proxy Setting</th>
+                        <td><span class="badge badge-secondary" id="cfg-trust-proxy">-</span></td>
+                      </tr>
+                      <tr>
+                        <th>Server Port</th>
+                        <td><code id="cfg-port">-</code></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            <!-- Side Tools -->
+            <div class="col-lg-5">
+              <div class="card card-outline card-success">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="fas fa-calculator"></i> Client Compute Estimator</h3>
+                </div>
+                <div class="card-body">
+                  <div class="callout callout-success" id="calc-estimate-result">
+                    Loading data...
+                  </div>
+                  <small class="text-muted">
+                    *A cost value above 50,000 provides high protection against distributed bot attacks without burdening legitimate desktop or mobile browsers.
+                  </small>
+                </div>
+              </div>
+
+              <div class="card card-outline card-danger">
+                <div class="card-header">
+                  <h3 class="card-title"><i class="fas fa-trash-alt"></i> Redis Anti-Replay Cache</h3>
+                </div>
+                <div class="card-body">
+                  <p style="font-size:0.9rem;color:#6c757d;">
+                    Every verified ALTCHA challenge solution is stored in the anti-replay cache to prevent replay attacks and token re-use.
+                  </p>
+                  <button class="btn btn-danger btn-sm" id="btn-flush-redis" onclick="SentinelSettings.flushRedisCache()">
+                    <i class="fas fa-eraser"></i> Flush Replay Cache
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 5: PLAYGROUND & INTEGRATION -->
+        <section class="tab-pane" id="tab-playground">
+          <div class="row">
+            <!-- Widget Live Test -->
+            <div class="col-lg-6">
+              <div class="card card-outline card-primary">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-vial"></i> Interactive ALTCHA Widget Playground
+                  </h3>
+                </div>
+                <div class="card-body text-center" style="text-align:center;padding:24px;">
+                  <div style="display:flex;justify-content:center;margin-bottom:15px;">
+                    <altcha-widget id="sentinel-demo-widget" style="width:100%;max-width:360px;"></altcha-widget>
+                  </div>
+                  <div class="badge badge-info mb-3" id="widget-state-indicator" style="font-size:0.85rem;">
+                    Widget State: ready
+                  </div>
+
+                  <div style="text-align:left;margin-top:10px;">
+                    <label class="form-label">Verified Base64 Payload:</label>
+                    <div class="code-box" style="max-height:100px;">
+                      <pre id="widget-payload-output">Click the checkbox above to solve the PoW...</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Manual Debugger -->
+            <div class="col-lg-6">
+              <div class="card card-outline card-info">
+                <div class="card-header">
+                  <h3 class="card-title">
+                    <i class="fas fa-bug"></i> Manual API Debugger
+                  </h3>
+                </div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <button class="btn btn-default btn-sm" onclick="SentinelPlayground.testManualChallenge()">
+                      <i class="fas fa-download"></i> Request Challenge (/challenge)
+                    </button>
+                    <div class="code-box mt-2" style="max-height:130px;margin-top:8px;">
+                      <pre id="manual-challenge-output">Click the button above to test raw challenge response.</pre>
+                    </div>
+                  </div>
+
+                  <div class="form-group">
+                    <label class="form-label">Verify Raw Payload (/verify)</label>
+                    <div class="input-group">
+                      <input type="text" class="form-control font-mono" id="manual-verify-input" placeholder="Paste base64 payload here...">
+                      <div class="input-group-append">
+                        <button class="btn btn-primary" onclick="SentinelPlayground.testManualVerify()">
+                          <i class="fas fa-check"></i> Verify
+                        </button>
+                      </div>
+                    </div>
+                    <div class="code-box mt-2" style="max-height:130px;margin-top:8px;">
+                      <pre id="manual-verify-output">Verification output will appear here.</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Code Snippets Hub -->
+          <div class="card card-outline card-secondary">
+            <div class="card-header">
+              <h3 class="card-title">
+                <i class="fas fa-code"></i> Client & Server Integration Code Snippets
+              </h3>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="font-size:0.9rem;">1. Frontend HTML Form</strong>
+                  <button class="btn btn-default btn-sm" onclick="SentinelPlayground.copyCode('code-snippet-html')">
+                    <i class="fas fa-copy"></i> Copy
+                  </button>
+                </div>
+                <div class="code-box"><pre id="code-snippet-html"></pre></div>
+              </div>
+
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="font-size:0.9rem;">2. Backend Node.js (Express)</strong>
+                  <button class="btn btn-default btn-sm" onclick="SentinelPlayground.copyCode('code-snippet-node')">
+                    <i class="fas fa-copy"></i> Copy
+                  </button>
+                </div>
+                <div class="code-box"><pre id="code-snippet-node"></pre></div>
+              </div>
+
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="font-size:0.9rem;">3. Backend PHP</strong>
+                  <button class="btn btn-default btn-sm" onclick="SentinelPlayground.copyCode('code-snippet-php')">
+                    <i class="fas fa-copy"></i> Copy
+                  </button>
+                </div>
+                <div class="code-box"><pre id="code-snippet-php"></pre></div>
+              </div>
+
+              <div class="form-group">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                  <strong style="font-size:0.9rem;">4. cURL CLI</strong>
+                  <button class="btn btn-default btn-sm" onclick="SentinelPlayground.copyCode('code-snippet-curl')">
+                    <i class="fas fa-copy"></i> Copy
+                  </button>
+                </div>
+                <div class="code-box"><pre id="code-snippet-curl"></pre></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </div>
+
+    <!-- Main Footer -->
+    <footer class="main-footer">
+      <strong>Copyright &copy; 2026 <a href="https://altcha.org" target="_blank">ALTCHA Manager</a>.</strong> All rights reserved.
+      <div class="float-right d-none d-sm-inline-block">
+        <b>Version</b> 2.5.0 (ALTCHA Man)
+      </div>
+    </footer>
+  </div>
+
+  <!-- Detail Log Inspector Modal -->
+  <div class="modal-backdrop" id="log-detail-modal" onclick="if(event.target===this) SentinelLogs.closeDetail()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h4 class="modal-title"><i class="fas fa-info-circle text-primary"></i> HTTP Event Log Details</h4>
+        <button type="button" class="btn btn-default btn-sm" onclick="SentinelLogs.closeDetail()">&times;</button>
+      </div>
+      <div class="modal-body" id="log-detail-content">
+        <!-- Dynamically populated -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" onclick="SentinelLogs.closeDetail()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Official AdminLTE Dependencies (ColorlibHQ/AdminLTE) -->
+  <script src="./js/jquery.min.js"></script>
+  <script src="./js/bootstrap.bundle.min.js"></script>
+  <script src="./js/adminlte.min.js"></script>
+
+  <!-- Sentinel Application Scripts -->
+  <script src="./js/api.js"></script>
+  <script src="./js/dashboard.js"></script>
+  <script src="./js/logs.js"></script>
+  <script src="./js/whitelist.js"></script>
+  <script src="./js/settings.js"></script>
+  <script src="./js/playground.js"></script>
+  <script src="./js/app.js"></script>
+</body>
+</html>

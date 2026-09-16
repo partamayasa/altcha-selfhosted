@@ -96,7 +96,7 @@
         challengeurl="https://altcha.partamayasa.my.id/challenge">
       </altcha-widget>
 
-      <button type="submit">Kirim Verifikasi</button>
+      <button type="submit">Submit Verification</button>
       <div id="status-msg"></div>
     </form>
   </div>
@@ -109,14 +109,14 @@
       widget.addEventListener('error', (e) => {
         msg.style.display = 'block';
         msg.style.color = '#dc2626';
-        msg.textContent = 'Error: ' + (e.detail?.error || 'Gagal memuat verifikasi');
+        msg.textContent = 'Error: ' + (e.detail?.error || 'Failed to load verification');
       });
 
       widget.addEventListener('statechange', (e) => {
         if (e.detail?.state === 'verified') {
           msg.style.display = 'block';
           msg.style.color = '#16a34a';
-          msg.textContent = 'Verifikasi berhasil diselesaikan!';
+          msg.textContent = 'Verification completed successfully!';
         }
       });
     }

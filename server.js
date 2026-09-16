@@ -180,11 +180,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-const redisClient = createClient({
-  url: REDIS_URL
-});
-
-redisClient.on('error', (err) => console.error('Redis Client Error:', err));
+let redisClient = null;
 
 async function connectRedis() {
   if (!REDIS_URL) {
@@ -193,14 +189,26 @@ async function connectRedis() {
   }
 
   let retries = REDIS_RETRY_ATTEMPTS;
-  while (retries) {
+  while (retries > 0) {
     try {
-      await redisClient.connect();
+      const client = createClient({
+        url: REDIS_URL,
+        socket: {
+          reconnectStrategy: false
+        }
+      });
+      client.on('error', (err) => {
+        if (client.isOpen) {
+          console.error('Redis Client Error:', err.message);
+        }
+      });
+      await client.connect();
+      redisClient = client;
       console.log('Connected to Redis successfully.');
-      break;
+      return;
     } catch (err) {
-      console.error(`Failed to connect to Redis. Remaining retries: ${retries - 1}`, err.message);
       retries -= 1;
+      console.error(`Failed to connect to Redis (${err.message}). Remaining retries: ${retries}`);
       if (retries === 0) {
         console.error('Unable to connect to Redis. Application will continue running without anti-replay cache.');
       } else {
@@ -216,7 +224,7 @@ let rateLimiter = null;
 
 if (RATE_LIMIT_ENABLED) {
   let rateLimitStore;
-  if (redisClient.isOpen) {
+  if (redisClient?.isOpen) {
     try {
       rateLimitStore = new RedisStore({
         sendCommand: (...args) => redisClient.sendCommand(args),
@@ -257,7 +265,7 @@ const applyRateLimit = (req, res, next) => {
 
 const store = {
   get: async (key) => {
-    if (!redisClient.isOpen) return null;
+    if (!redisClient?.isOpen) return null;
     try {
       return await redisClient.get(key);
     } catch (err) {
@@ -266,7 +274,7 @@ const store = {
     }
   },
   set: async (key, value) => {
-    if (!redisClient.isOpen) return;
+    if (!redisClient?.isOpen) return;
     try {
       await redisClient.setEx(key, EXPIRES_IN, '1');
     } catch (err) {
@@ -346,6 +354,305 @@ const whitelistGuard = (req, res, next) => {
   });
 };
 
+const WEB_DIR = path.join(__dirname, 'web');
+
+function parseLogLine(line) {
+  if (!line || !line.trim()) return null;
+  const parts = line.split(' | ').map((p) => p.trim());
+  if (parts.length < 7) return null;
+
+  const timestamp = parts[0];
+  const ip = parts[1];
+  const methodUrl = parts[2];
+  const status = parseInt(parts[3], 10) || 0;
+  const duration = parts[4];
+  const durationMs = parseInt(duration, 10) || 0;
+  const originPart = parts[5];
+  const origin = originPart.startsWith('Origin: ') ? originPart.substring(8) : originPart;
+  const result = parts.slice(6).join(' | ');
+
+  const [method, ...urlParts] = methodUrl.split(' ');
+  const url = urlParts.join(' ');
+
+  return {
+    timestamp,
+    ip,
+    method,
+    url,
+    status,
+    duration,
+    durationMs,
+    origin,
+    result,
+    isSuccess: result === 'SUCCESS' || (status >= 200 && status < 400 && !result.startsWith('ERROR'))
+  };
+}
+
+function getAvailableLogDates() {
+  if (!fs.existsSync(LOG_DIR)) return [];
+  try {
+    const files = fs.readdirSync(LOG_DIR);
+    const dates = [];
+    for (const f of files) {
+      const match = f.match(/^altcha-log\.(\d{4}-\d{2}-\d{2})\.log$/);
+      if (match) {
+        dates.push(match[1]);
+      }
+    }
+    return dates.sort().reverse();
+  } catch (err) {
+    console.error('Failed to list log dates:', err.message);
+    return [];
+  }
+}
+
+function readLogLinesForDate(dateStr) {
+  const dates = getAvailableLogDates();
+  const targetDate = dateStr && dates.includes(dateStr) ? dateStr : (dates[0] || null);
+  if (!targetDate) return [];
+
+  const filePath = path.join(LOG_DIR, `altcha-log.${targetDate}.log`);
+  if (!fs.existsSync(filePath)) return [];
+
+  try {
+    const content = fs.readFileSync(filePath, 'utf8');
+    const lines = content.split('\n').filter(Boolean);
+    const parsed = [];
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const p = parseLogLine(lines[i]);
+      if (p) parsed.push(p);
+    }
+    return parsed;
+  } catch (err) {
+    console.error('Failed to read log file:', err.message);
+    return [];
+  }
+}
+
+// Sentinel Management APIs
+app.get('/api/sentinel/stats', (req, res) => {
+  const requestedDate = req.query.date;
+  const logs = readLogLinesForDate(requestedDate);
+
+  let totalLatency = 0;
+  let challengesCount = 0;
+  let verificationsCount = 0;
+  let verifiedSuccess = 0;
+  let blockedCount = 0;
+  let rateLimitedCount = 0;
+  const statusCounts = {};
+  const originCounts = {};
+  const ipCounts = {};
+
+  const hourlyMap = {};
+  for (let h = 0; h < 24; h++) {
+    const hh = String(h).padStart(2, '0');
+    hourlyMap[hh] = { hour: hh, count: 0, success: 0, errors: 0 };
+  }
+
+  logs.forEach((item) => {
+    totalLatency += item.durationMs;
+    statusCounts[item.status] = (statusCounts[item.status] || 0) + 1;
+
+    if (item.url.includes('/challenge')) challengesCount++;
+    if (item.url.includes('/verify')) {
+      verificationsCount++;
+      if (item.isSuccess) verifiedSuccess++;
+    }
+    if (item.status === 403) blockedCount++;
+    if (item.status === 429) rateLimitedCount++;
+
+    const originKey = item.origin || '-';
+    originCounts[originKey] = (originCounts[originKey] || 0) + 1;
+    ipCounts[item.ip] = (ipCounts[item.ip] || 0) + 1;
+
+    if (item.timestamp) {
+      try {
+        const hh = item.timestamp.split('T')[1].substring(0, 2);
+        if (hourlyMap[hh]) {
+          hourlyMap[hh].count++;
+          if (item.isSuccess) hourlyMap[hh].success++;
+          else hourlyMap[hh].errors++;
+        }
+      } catch { }
+    }
+  });
+
+  const total = logs.length;
+  const avgLatencyMs = total > 0 ? Math.round(totalLatency / total) : 0;
+
+  const topOrigins = Object.entries(originCounts)
+    .map(([origin, count]) => ({ origin, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const topIps = Object.entries(ipCounts)
+    .map(([ip, count]) => ({ ip, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10);
+
+  const mem = process.memoryUsage();
+
+  res.json({
+    date: requestedDate || getAvailableLogDates()[0] || new Date().toISOString().split('T')[0],
+    totalRequests: total,
+    avgLatencyMs,
+    challengesCount,
+    verificationsCount,
+    verifiedSuccess,
+    blockedCount,
+    rateLimitedCount,
+    statusCounts,
+    topOrigins,
+    topIps,
+    hourlyActivity: Object.values(hourlyMap),
+    system: {
+      uptime: Math.floor(process.uptime()),
+      memory: {
+        rssMb: Math.round(mem.rss / 1024 / 1024),
+        heapUsedMb: Math.round(mem.heapUsed / 1024 / 1024),
+        heapTotalMb: Math.round(mem.heapTotal / 1024 / 1024)
+      },
+      redis: {
+        connected: !!redisClient?.isOpen,
+        url: REDIS_URL ? 'configured' : 'none'
+      },
+      rateLimiter: {
+        enabled: RATE_LIMIT_ENABLED,
+        max: RATE_LIMIT_MAX,
+        windowMs: RATE_LIMIT_WINDOW_MS,
+        store: redisClient?.isOpen ? 'RedisStore' : 'MemoryStore'
+      }
+    }
+  });
+});
+
+app.get('/api/sentinel/logs', (req, res) => {
+  const { date, status, search, page = 1, limit = 50 } = req.query;
+  let logs = readLogLinesForDate(date);
+
+  if (status) {
+    const statusNum = parseInt(status, 10);
+    logs = logs.filter((l) => l.status === statusNum);
+  }
+
+  if (search) {
+    const q = String(search).toLowerCase();
+    logs = logs.filter((l) =>
+      l.ip.toLowerCase().includes(q) ||
+      l.url.toLowerCase().includes(q) ||
+      l.origin.toLowerCase().includes(q) ||
+      l.result.toLowerCase().includes(q)
+    );
+  }
+
+  const pageNum = Math.max(parseInt(page, 10) || 1, 1);
+  const limitNum = Math.min(Math.max(parseInt(limit, 10) || 50, 10), 200);
+  const total = logs.length;
+  const totalPages = Math.ceil(total / limitNum) || 1;
+  const startIndex = (pageNum - 1) * limitNum;
+  const pagedLogs = logs.slice(startIndex, startIndex + limitNum);
+
+  res.json({
+    total,
+    page: pageNum,
+    limit: limitNum,
+    totalPages,
+    logs: pagedLogs
+  });
+});
+
+app.get('/api/sentinel/logs/dates', (req, res) => {
+  res.json(getAvailableLogDates());
+});
+
+app.get('/api/sentinel/whitelist', (req, res) => {
+  res.json(getWhitelistConfig());
+});
+
+app.post('/api/sentinel/whitelist', (req, res) => {
+  const { enabled, allowDirectAccess, domains } = req.body;
+  if (typeof enabled !== 'boolean' || typeof allowDirectAccess !== 'boolean' || !Array.isArray(domains)) {
+    return res.status(400).json({ error: 'Invalid whitelist structure provided.' });
+  }
+
+  const sanitizedDomains = domains
+    .filter((d) => typeof d === 'string' && d.trim().length > 0)
+    .map((d) => d.trim());
+
+  const newConfig = {
+    enabled,
+    allowDirectAccess,
+    domains: sanitizedDomains
+  };
+
+  try {
+    fs.writeFileSync(WHITELIST_FILE, JSON.stringify(newConfig, null, 2), 'utf8');
+    res.json({
+      success: true,
+      message: 'Whitelist configuration updated successfully.',
+      config: newConfig
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to write whitelist file: ' + err.message });
+  }
+});
+
+app.post('/api/sentinel/whitelist/test', (req, res) => {
+  const { origin } = req.body;
+  if (!origin) {
+    return res.status(400).json({ error: 'Origin parameter is required.' });
+  }
+
+  const config = getWhitelistConfig();
+  if (!config.enabled) {
+    return res.json({ allowed: true, matchedRule: 'Whitelist is currently disabled (All allowed)' });
+  }
+
+  const matched = config.domains.find((rule) => matchDomainRule(origin, rule));
+  if (matched) {
+    return res.json({ allowed: true, matchedRule: matched });
+  }
+
+  return res.json({ allowed: false, matchedRule: null });
+});
+
+app.get('/api/sentinel/config', (req, res) => {
+  res.json({
+    algorithm: ALGORITHM,
+    cost: COST,
+    expiresIn: EXPIRES_IN,
+    rateLimitMax: RATE_LIMIT_MAX,
+    rateLimitWindowMs: RATE_LIMIT_WINDOW_MS,
+    redisConnected: !!redisClient?.isOpen,
+    trustProxy: parsedProxy,
+    port: PORT,
+    host: HOST
+  });
+});
+
+app.post('/api/sentinel/redis/flush', async (req, res) => {
+  if (!redisClient?.isOpen) {
+    return res.status(400).json({ error: 'Redis is not connected.' });
+  }
+  try {
+    // Flush keys with prefix altcha
+    const keys = await redisClient.keys('altcha*');
+    if (keys.length > 0) {
+      await redisClient.del(keys);
+    }
+    res.json({ success: true, message: `Successfully flushed ${keys.length} ALTCHA cache keys from Redis.` });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to flush Redis: ' + err.message });
+  }
+});
+
+// Serve Manager Web Application Assets
+app.use('/manager', express.static(WEB_DIR));
+app.use('/sentinel', express.static(WEB_DIR));
+app.use(express.static(WEB_DIR));
+app.use('/altcha.min.js', express.static(path.join(__dirname, 'altcha.min.js')));
+
 app.get('/health', applyRateLimit, (req, res) => {
   res.json({
     status: 'ok',
@@ -361,4 +668,5 @@ app.post('/altcha/verify', applyRateLimit, whitelistGuard, altcha.verifyHandler)
 
 app.listen(PORT, HOST, () => {
   console.log(`ALTCHA server (v2) is ready to run on http://${HOST}:${PORT}`);
+  console.log(`ALTCHA Manager (ALTCHA Man) UI is available at http://${HOST}:${PORT}/manager`);
 });

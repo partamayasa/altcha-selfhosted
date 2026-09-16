@@ -10,8 +10,9 @@ services:
     depends_on:
       - redis
     volumes:
-      - ./whitelist.json:/app/whitelist.json:ro
+      - ./whitelist.json:/app/whitelist.json
       - ./log:/app/log
+      - ./web:/app/web
     networks:
       - altcha-net
       - nginxpm_default

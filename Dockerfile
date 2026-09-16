@@ -8,6 +8,8 @@ RUN npm install --production
 
 COPY server.js .
 COPY whitelist.json* ./
+COPY altcha.min.js* ./
+COPY web/ ./web/
 
 EXPOSE 3000
 
