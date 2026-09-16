@@ -1,7 +1,7 @@
 if (typeof process.loadEnvFile === 'function') {
   try {
     process.loadEnvFile();
-  } catch {}
+  } catch { }
 }
 
 import express from 'express';
@@ -18,6 +18,32 @@ import { RedisStore } from 'rate-limit-redis';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const WHITELIST_FILE = path.join(__dirname, 'whitelist.json');
+const LOG_DIR = path.join(__dirname, 'log');
+
+if (!fs.existsSync(LOG_DIR)) {
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  } catch (err) {
+    console.error('Failed to create log directory:', err.message);
+  }
+}
+
+function getLogFilePath() {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return path.join(LOG_DIR, `altcha-log.${yyyy}-${mm}-${dd}.log`);
+}
+
+function writeAccessLog(entry) {
+  console.log(entry);
+  fs.appendFile(getLogFilePath(), entry + '\n', 'utf8', (err) => {
+    if (err) {
+      console.error('Failed to write access log:', err.message);
+    }
+  });
+}
 
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -32,7 +58,7 @@ const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const TRUST_PROXY = process.env.TRUST_PROXY || '1';
 const RATE_LIMIT_ENABLED = process.env.RATE_LIMIT_ENABLED !== 'false';
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60 * 1000;
-const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX, 10) || 60;
+const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX, 10) || 15;
 
 if (!HMAC_KEY) {
   console.warn('WARNING: ALTCHA_HMAC_KEY is not detected in environment variables! Make sure to set it in the .env file.');
@@ -45,6 +71,37 @@ const app = express();
 
 const parsedProxy = TRUST_PROXY === 'true' ? true : (TRUST_PROXY === 'false' ? false : (isNaN(Number(TRUST_PROXY)) ? TRUST_PROXY : Number(TRUST_PROXY)));
 app.set('trust proxy', parsedProxy);
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  const ip = req.ip || req.socket.remoteAddress || '-';
+  const origin = req.headers['x-origin'] || req.headers.origin || '-';
+
+  const originalJson = res.json;
+  res.json = function (data) {
+    if (data && typeof data === 'object') {
+      if (data.error) {
+        res.locals.logError = data.error;
+      } else if (data.verification && data.verification.verified === false) {
+        res.locals.logError = 'Verification failed';
+      }
+    }
+    return originalJson.call(this, data);
+  };
+
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    const status = res.statusCode;
+    const timestamp = new Date().toISOString();
+
+    const isSuccess = status >= 200 && status < 400 && !res.locals.logError;
+    const resultText = isSuccess ? 'SUCCESS' : `ERROR: ${res.locals.logError || `HTTP ${status}`}`;
+
+    writeAccessLog(`${timestamp} | ${ip} | ${req.method} ${req.originalUrl} | ${status} | ${duration}ms | Origin: ${origin} | ${resultText}`);
+  });
+
+  next();
+});
 
 function getWhitelistConfig() {
   if (fs.existsSync(WHITELIST_FILE)) {
@@ -259,8 +316,8 @@ const whitelistGuard = (req, res, next) => {
   const config = getWhitelistConfig();
   if (!config.enabled) return next();
 
-  const origin = req.headers.origin;
-  const referer = req.headers.referer;
+  const origin = req.headers['x-origin'] || req.headers.origin;
+  const referer = req.headers['x-referer'] || req.headers.referer;
 
   if (!origin && !referer) {
     if (config.allowDirectAccess || req.path === '/verify' || req.path === '/altcha/verify') {
@@ -277,7 +334,7 @@ const whitelistGuard = (req, res, next) => {
     try {
       const refererOrigin = new URL(referer).origin;
       isRefererAllowed = config.domains.some((rule) => matchDomainRule(refererOrigin, rule));
-    } catch {}
+    } catch { }
   }
 
   if (isOriginAllowed || isRefererAllowed) {
@@ -289,8 +346,11 @@ const whitelistGuard = (req, res, next) => {
   });
 };
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+app.get('/health', applyRateLimit, (req, res) => {
+  res.json({
+    status: 'ok',
+    limit: RATE_LIMIT_MAX
+  });
 });
 
 app.get('/challenge', applyRateLimit, whitelistGuard, altcha.challengeHandler);

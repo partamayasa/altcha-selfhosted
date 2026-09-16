@@ -11,6 +11,7 @@ services:
       - redis
     volumes:
       - ./whitelist.json:/app/whitelist.json:ro
+      - ./log:/app/log
     networks:
       - altcha-net
       - nginxpm_default

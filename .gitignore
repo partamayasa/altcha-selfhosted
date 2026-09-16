@@ -1,3 +1,6 @@
 .env
 node_modules/
 whitelist.json
+log/*
+!log/.gitkeep
+*.log
