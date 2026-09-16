@@ -1,10 +1,7 @@
-// Load environment variables from .env file if running in Node directly (Node 20.6+)
 if (typeof process.loadEnvFile === 'function') {
   try {
     process.loadEnvFile();
-  } catch {
-    // Ignore error if .env file is not found (e.g. passed through Docker env)
-  }
+  } catch {}
 }
 
 import express from 'express';
@@ -20,7 +17,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const WHITELIST_FILE = path.join(__dirname, 'whitelist.json');
 
-// Environment Configurations
 const PORT = parseInt(process.env.PORT, 10) || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const HMAC_KEY = process.env.ALTCHA_HMAC_KEY;
@@ -42,11 +38,9 @@ const hmacKeySignatureSecret = process.env.ALTCHA_HMAC_KEY_SECRET || (await deri
 
 const app = express();
 
-// Trust proxy settings (useful behind reverse proxies like Nginx/Traefik/Cloudflare)
 const parsedProxy = TRUST_PROXY === 'true' ? true : (TRUST_PROXY === 'false' ? false : (isNaN(Number(TRUST_PROXY)) ? TRUST_PROXY : Number(TRUST_PROXY)));
 app.set('trust proxy', parsedProxy);
 
-// Helper: Load whitelist configuration (dynamically reads whitelist.json if present)
 function getWhitelistConfig() {
   if (fs.existsSync(WHITELIST_FILE)) {
     try {
@@ -64,7 +58,6 @@ function getWhitelistConfig() {
     }
   }
 
-  // Fallback to CORS_ORIGIN from .env if whitelist.json is not present
   if (CORS_ORIGIN && CORS_ORIGIN !== '*') {
     return {
       enabled: true,
@@ -80,7 +73,6 @@ function getWhitelistConfig() {
   };
 }
 
-// Helper: Match domain rule supporting exact match and wildcards (e.g. https://*.domain.com)
 function matchDomainRule(origin, rule) {
   if (!origin || !rule) return false;
   if (rule === '*') return true;
@@ -107,14 +99,12 @@ function matchDomainRule(origin, rule) {
   return false;
 }
 
-// CORS configuration (dynamic check against whitelist)
 app.use(cors({
   origin: (origin, callback) => {
     const config = getWhitelistConfig();
     if (!config.enabled) {
       return callback(null, true);
     }
-    // Requests without origin header (e.g. same-origin, curl, server-to-server)
     if (!origin) {
       return callback(null, true);
     }
@@ -128,7 +118,6 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Redis Client Setup
 const redisClient = createClient({
   url: REDIS_URL
 });
@@ -161,7 +150,6 @@ async function connectRedis() {
 
 await connectRedis();
 
-// Custom Store adapter for Redis
 const store = {
   get: async (key) => {
     if (!redisClient.isOpen) return null;
@@ -182,7 +170,6 @@ const store = {
   }
 };
 
-// Initialize ALTCHA v2 instance
 const altcha = create({
   hmacSignatureSecret,
   hmacKeySignatureSecret,
@@ -196,7 +183,6 @@ const altcha = create({
   store,
 });
 
-// Middleware: normalize request body to support both 'altcha' and 'payload' field names
 app.use((req, res, next) => {
   if (req.body && !req.body.altcha && req.body.payload) {
     req.body.altcha = req.body.payload;
@@ -204,7 +190,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Middleware: enhance JSON response to ensure backward compatibility with { success: true/false }
 app.use((req, res, next) => {
   const originalJson = res.json;
   res.json = function (data) {
@@ -222,7 +207,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Whitelist Guard Middleware for Altcha endpoints
 const whitelistGuard = (req, res, next) => {
   const config = getWhitelistConfig();
   if (!config.enabled) return next();
@@ -230,9 +214,7 @@ const whitelistGuard = (req, res, next) => {
   const origin = req.headers.origin;
   const referer = req.headers.referer;
 
-  // Requests without Origin and without Referer
   if (!origin && !referer) {
-    // Allow backend server-to-server verification or when allowDirectAccess is enabled
     if (config.allowDirectAccess || req.path === '/verify' || req.path === '/altcha/verify') {
       return next();
     }
@@ -259,31 +241,13 @@ const whitelistGuard = (req, res, next) => {
   });
 };
 
-// Health check endpoint
 app.get('/health', (req, res) => {
-  const config = getWhitelistConfig();
-  res.json({
-    status: 'ok',
-    version: '2.5.0',
-    protocol: 'v2',
-    algorithm: ALGORITHM,
-    cost: COST,
-    expiresIn: EXPIRES_IN,
-    redisConnected: redisClient.isOpen,
-    whitelist: {
-      enabled: config.enabled,
-      allowDirectAccess: config.allowDirectAccess,
-      domainsCount: config.domains.length,
-      domains: config.domains
-    }
-  });
+  res.json({ status: 'ok' });
 });
 
-// Challenge endpoints
 app.get('/challenge', whitelistGuard, altcha.challengeHandler);
 app.get('/altcha/challenge', whitelistGuard, altcha.challengeHandler);
 
-// Verification endpoints
 app.post('/verify', whitelistGuard, altcha.verifyHandler);
 app.post('/altcha/verify', whitelistGuard, altcha.verifyHandler);
 
