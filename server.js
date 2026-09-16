@@ -9,9 +9,16 @@ if (typeof process.loadEnvFile === 'function') {
 
 import express from 'express';
 import cors from 'cors';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { create, deriveHmacKeySecret, randomInt } from 'altcha-lib/frameworks/express';
 import { deriveKey } from 'altcha-lib/algorithms/pbkdf2';
 import { createClient } from 'redis';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const WHITELIST_FILE = path.join(__dirname, 'whitelist.json');
 
 // Environment Configurations
 const PORT = parseInt(process.env.PORT, 10) || 3000;
@@ -39,9 +46,84 @@ const app = express();
 const parsedProxy = TRUST_PROXY === 'true' ? true : (TRUST_PROXY === 'false' ? false : (isNaN(Number(TRUST_PROXY)) ? TRUST_PROXY : Number(TRUST_PROXY)));
 app.set('trust proxy', parsedProxy);
 
-// CORS configuration
+// Helper: Load whitelist configuration (dynamically reads whitelist.json if present)
+function getWhitelistConfig() {
+  if (fs.existsSync(WHITELIST_FILE)) {
+    try {
+      const data = fs.readFileSync(WHITELIST_FILE, 'utf-8');
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed === 'object') {
+        return {
+          enabled: parsed.enabled !== false,
+          allowDirectAccess: parsed.allowDirectAccess === true,
+          domains: Array.isArray(parsed.domains) ? parsed.domains : []
+        };
+      }
+    } catch (err) {
+      console.error('Error reading whitelist.json:', err.message);
+    }
+  }
+
+  // Fallback to CORS_ORIGIN from .env if whitelist.json is not present
+  if (CORS_ORIGIN && CORS_ORIGIN !== '*') {
+    return {
+      enabled: true,
+      allowDirectAccess: false,
+      domains: CORS_ORIGIN.split(',').map((o) => o.trim()).filter(Boolean)
+    };
+  }
+
+  return {
+    enabled: false,
+    allowDirectAccess: true,
+    domains: []
+  };
+}
+
+// Helper: Match domain rule supporting exact match and wildcards (e.g. https://*.domain.com)
+function matchDomainRule(origin, rule) {
+  if (!origin || !rule) return false;
+  if (rule === '*') return true;
+  if (origin === rule) return true;
+
+  if (rule.includes('*')) {
+    try {
+      const ruleUrl = new URL(rule.replace('*.', 'wildcard-temp.'));
+      const originUrl = new URL(origin);
+
+      if (ruleUrl.protocol !== originUrl.protocol) return false;
+      if (ruleUrl.port !== originUrl.port) return false;
+
+      const ruleHostSuffix = ruleUrl.hostname.replace('wildcard-temp.', '');
+      return (
+        originUrl.hostname === ruleHostSuffix ||
+        originUrl.hostname.endsWith('.' + ruleHostSuffix)
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+// CORS configuration (dynamic check against whitelist)
 app.use(cors({
-  origin: CORS_ORIGIN === '*' ? '*' : CORS_ORIGIN.split(',').map((o) => o.trim())
+  origin: (origin, callback) => {
+    const config = getWhitelistConfig();
+    if (!config.enabled) {
+      return callback(null, true);
+    }
+    // Requests without origin header (e.g. same-origin, curl, server-to-server)
+    if (!origin) {
+      return callback(null, true);
+    }
+    const isAllowed = config.domains.some((rule) => matchDomainRule(origin, rule));
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  }
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -140,8 +222,46 @@ app.use((req, res, next) => {
   next();
 });
 
+// Whitelist Guard Middleware for Altcha endpoints
+const whitelistGuard = (req, res, next) => {
+  const config = getWhitelistConfig();
+  if (!config.enabled) return next();
+
+  const origin = req.headers.origin;
+  const referer = req.headers.referer;
+
+  // Requests without Origin and without Referer
+  if (!origin && !referer) {
+    // Allow backend server-to-server verification or when allowDirectAccess is enabled
+    if (config.allowDirectAccess || req.path === '/verify' || req.path === '/altcha/verify') {
+      return next();
+    }
+    return res.status(403).json({
+      error: 'Forbidden: Direct access without Origin or Referer header is not allowed.'
+    });
+  }
+
+  const isOriginAllowed = origin && config.domains.some((rule) => matchDomainRule(origin, rule));
+  let isRefererAllowed = false;
+  if (referer) {
+    try {
+      const refererOrigin = new URL(referer).origin;
+      isRefererAllowed = config.domains.some((rule) => matchDomainRule(refererOrigin, rule));
+    } catch {}
+  }
+
+  if (isOriginAllowed || isRefererAllowed) {
+    return next();
+  }
+
+  return res.status(403).json({
+    error: 'Forbidden: Origin or Referer is not in the allowed domain whitelist.'
+  });
+};
+
 // Health check endpoint
 app.get('/health', (req, res) => {
+  const config = getWhitelistConfig();
   res.json({
     status: 'ok',
     version: '2.5.0',
@@ -149,17 +269,23 @@ app.get('/health', (req, res) => {
     algorithm: ALGORITHM,
     cost: COST,
     expiresIn: EXPIRES_IN,
-    redisConnected: redisClient.isOpen
+    redisConnected: redisClient.isOpen,
+    whitelist: {
+      enabled: config.enabled,
+      allowDirectAccess: config.allowDirectAccess,
+      domainsCount: config.domains.length,
+      domains: config.domains
+    }
   });
 });
 
 // Challenge endpoints
-app.get('/challenge', altcha.challengeHandler);
-app.get('/altcha/challenge', altcha.challengeHandler);
+app.get('/challenge', whitelistGuard, altcha.challengeHandler);
+app.get('/altcha/challenge', whitelistGuard, altcha.challengeHandler);
 
 // Verification endpoints
-app.post('/verify', altcha.verifyHandler);
-app.post('/altcha/verify', altcha.verifyHandler);
+app.post('/verify', whitelistGuard, altcha.verifyHandler);
+app.post('/altcha/verify', whitelistGuard, altcha.verifyHandler);
 
 app.listen(PORT, HOST, () => {
   console.log(`ALTCHA server (v2) is ready to run on http://${HOST}:${PORT}`);

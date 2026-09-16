@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "allowDirectAccess": false,
+  "domains": [
+    "https://yourdomain.com",
+    "https://*.yourdomain.com",
+    "http://localhost:3000",
+    "http://localhost:8080"
+  ]
+}
