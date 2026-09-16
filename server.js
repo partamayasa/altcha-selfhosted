@@ -12,6 +12,8 @@ import { fileURLToPath } from 'url';
 import { create, deriveHmacKeySecret, randomInt } from 'altcha-lib/frameworks/express';
 import { deriveKey } from 'altcha-lib/algorithms/pbkdf2';
 import { createClient } from 'redis';
+import { rateLimit } from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -28,6 +30,9 @@ const REDIS_RETRY_ATTEMPTS = parseInt(process.env.REDIS_RETRY_ATTEMPTS, 10) || 5
 const REDIS_RETRY_DELAY_MS = parseInt(process.env.REDIS_RETRY_DELAY_MS, 10) || 2000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 const TRUST_PROXY = process.env.TRUST_PROXY || '1';
+const RATE_LIMIT_ENABLED = process.env.RATE_LIMIT_ENABLED !== 'false';
+const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60 * 1000;
+const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX, 10) || 60;
 
 if (!HMAC_KEY) {
   console.warn('WARNING: ALTCHA_HMAC_KEY is not detected in environment variables! Make sure to set it in the .env file.');
@@ -150,6 +155,49 @@ async function connectRedis() {
 
 await connectRedis();
 
+let rateLimiter = null;
+
+if (RATE_LIMIT_ENABLED) {
+  let rateLimitStore;
+  if (redisClient.isOpen) {
+    try {
+      rateLimitStore = new RedisStore({
+        sendCommand: (...args) => redisClient.sendCommand(args),
+        prefix: 'altcha-rl:',
+      });
+      console.log('Rate limiter: Redis store enabled.');
+    } catch (err) {
+      console.warn('Rate limiter: Failed to initialize RedisStore, falling back to memory store:', err.message);
+    }
+  } else {
+    console.log('Rate limiter: In-memory store enabled.');
+  }
+
+  rateLimiter = rateLimit({
+    windowMs: RATE_LIMIT_WINDOW_MS,
+    limit: RATE_LIMIT_MAX,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+    store: rateLimitStore,
+    validate: {
+      trustProxy: false,
+    },
+    handler: (req, res) => {
+      res.status(429).json({
+        error: 'Too many requests from this IP, please try again later.',
+        success: false
+      });
+    }
+  });
+}
+
+const applyRateLimit = (req, res, next) => {
+  if (rateLimiter) {
+    return rateLimiter(req, res, next);
+  }
+  next();
+};
+
 const store = {
   get: async (key) => {
     if (!redisClient.isOpen) return null;
@@ -245,11 +293,11 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
-app.get('/challenge', whitelistGuard, altcha.challengeHandler);
-app.get('/altcha/challenge', whitelistGuard, altcha.challengeHandler);
+app.get('/challenge', applyRateLimit, whitelistGuard, altcha.challengeHandler);
+app.get('/altcha/challenge', applyRateLimit, whitelistGuard, altcha.challengeHandler);
 
-app.post('/verify', whitelistGuard, altcha.verifyHandler);
-app.post('/altcha/verify', whitelistGuard, altcha.verifyHandler);
+app.post('/verify', applyRateLimit, whitelistGuard, altcha.verifyHandler);
+app.post('/altcha/verify', applyRateLimit, whitelistGuard, altcha.verifyHandler);
 
 app.listen(PORT, HOST, () => {
   console.log(`ALTCHA server (v2) is ready to run on http://${HOST}:${PORT}`);
