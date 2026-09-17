@@ -13,25 +13,22 @@ altcha-selfhosted/
 │   ├── database.js               # SQLite access logging & aggregation
 │   └── server.js                 # Express server & API endpoints
 ├── web/                          # Frontend dashboard & AdminLTE v4 assets
-│   ├── index.html                # Main dashboard entry
-│   ├── playground.html           # Interactive testing & snippets
-│   ├── whitelist.html            # Domain whitelist management
-│   ├── audit-logs.html           # Live log explorer
-│   ├── js/                       # Modular UI scripts
-│   ├── partials/                 # Header, sidebar, footer templates
-│   └── dist/                     # AdminLTE & Bootstrap assets
-├── tools/                        # Development & testing utilities
-│   ├── altcha-widget.html        # Standalone widget test page
-│   └── altcha-rate-tester.html   # Rate limiter & whitelist test harness
-├── config/                       # Configuration templates
-│   └── whitelist.example.json    # Example domain whitelist configuration
-├── database/                     # SQLite database files (persistent volume)
-├── log/                          # Daily rotation text log files (persistent volume)
-├── Dockerfile                    # Production multi-stage Docker build
+│   ├── index.html                # Telemetry & metrics overview
+│   ├── keys.html                 # Key & Domain Manager (API keys & domain binding)
+│   ├── integration.html          # API, code snippets & widget playground
+│   ├── logs.html                 # Audit & access log explorer
+│   ├── users.html                # User & role management (admin only)
+│   ├── pow-policy.html           # Proof-of-Work difficulty configuration
+│   ├── settings.html             # Branding & general settings
+│   ├── login.html                # Authentication entry
+│   ├── templates/                # Modular sidebar, header, footer partials
+│   ├── css/                      # AdminLTE styling
+│   └── js/                       # Modular UI scripts
+├── database/                     # SQLite database files (altcha.db, log.altcha.db)
+├── Dockerfile                    # Production Docker build
 ├── docker-compose.yml            # Docker Compose deployment definition
 ├── .dockerignore                 # Docker build ignore patterns
-├── package.json                  # NPM dependencies & scripts
-└── whitelist.json                # Runtime domain whitelist configuration
+└── package.json                  # NPM dependencies & scripts
 ```
 
 ---
@@ -80,6 +77,5 @@ docker compose ps
 ```
 
 ### Persistent Volumes
-- `./database`: Contains SQLite database files (`altcha.db`).
-- `./log`: Contains daily access log files.
-- `./whitelist.json`: Live domain whitelist file mounted into the container.
+- `./database`: Contains SQLite database files (`altcha.db` for app data & `log.altcha.db` for telemetry/access logs).
+- `./log`: Access logs directory.
