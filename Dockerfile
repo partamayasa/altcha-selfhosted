@@ -10,11 +10,10 @@ RUN npm ci --omit=dev --ignore-scripts || npm install --omit=dev --ignore-script
 # Copy application source & assets
 COPY src/ ./src/
 COPY web/ ./web/
-COPY config/ ./config/
 COPY altcha.min.js* ./
 
-# Create data & log directories with appropriate non-root ownership
-RUN mkdir -p database log && chown -R node:node /app
+# Create data directory with appropriate non-root ownership
+RUN mkdir -p database && chown -R node:node /app
 
 # Run as non-root node user for container security
 USER node

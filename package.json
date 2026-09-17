@@ -5,7 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch-path=src --watch-path=web src/server.js"
   },
   "dependencies": {
     "altcha-lib": "^2.5.0",

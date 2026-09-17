@@ -12,148 +12,194 @@ import { PATHS } from './config.js';
 
 const DB_DIR = PATHS.databaseDir;
 const DB_FILE = PATHS.databaseFile;
+const LOG_DB_FILE = PATHS.logDatabaseFile;
+const isNewMainDb = !fs.existsSync(DB_FILE);
+const isNewLogDb = !fs.existsSync(LOG_DB_FILE);
 
 if (!fs.existsSync(DB_DIR)) {
   try {
     fs.mkdirSync(DB_DIR, { recursive: true });
+    console.log(`[Database] Created database directory at: ${DB_DIR}`);
   } catch (err) {
     console.error('[Database] Failed to create database directory:', err.message);
   }
 }
 
+if (isNewMainDb || isNewLogDb) {
+  console.log('[Database] Missing database detected. Populating database structure & administrator account...');
+}
+
+// Main transactional database (users, sessions, settings)
 const db = new DatabaseSync(DB_FILE);
 
-// Initialize Tables & Indexes
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA synchronous = NORMAL;
+// Dedicated request logging database (access_logs)
+const logDb = new DatabaseSync(LOG_DB_FILE);
 
-  CREATE TABLE IF NOT EXISTS access_logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp TEXT NOT NULL,
-    date TEXT NOT NULL,
-    ip TEXT NOT NULL,
-    method TEXT NOT NULL,
-    url TEXT NOT NULL,
-    status INTEGER NOT NULL,
-    duration_ms INTEGER NOT NULL,
-    origin TEXT DEFAULT '-',
-    result TEXT NOT NULL,
-    is_success INTEGER NOT NULL
-  );
+function initMainSchema() {
+  db.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
 
-  CREATE INDEX IF NOT EXISTS idx_logs_date ON access_logs(date);
-  CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON access_logs(timestamp);
-  CREATE INDEX IF NOT EXISTS idx_logs_status ON access_logs(status);
-  CREATE INDEX IF NOT EXISTS idx_logs_ip ON access_logs(ip);
-  CREATE INDEX IF NOT EXISTS idx_logs_origin ON access_logs(origin);
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS app_settings (
-    key TEXT PRIMARY KEY NOT NULL,
-    value TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT UNIQUE NOT NULL,
+      full_name TEXT DEFAULT '',
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'user',
+      api_key TEXT UNIQUE,
+      allowed_origins TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
 
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    full_name TEXT DEFAULT '',
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'user',
-    api_key TEXT UNIQUE,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  );
+    CREATE TABLE IF NOT EXISTS sessions (
+      token TEXT PRIMARY KEY NOT NULL,
+      user_id INTEGER NOT NULL,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
 
-  CREATE TABLE IF NOT EXISTS sessions (
-    token TEXT PRIMARY KEY NOT NULL,
-    user_id INTEGER NOT NULL,
-    expires_at TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  );
+    CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
+  `);
 
-  CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
-`);
-
-// Migration: Ensure 'role', 'api_key', and 'full_name' columns exist in users table
-try {
-  const userColumns = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
-  if (!userColumns.includes('role')) {
-    db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+  // Migration: Ensure 'role', 'api_key', 'full_name', 'allowed_origins' columns exist in users table
+  try {
+    const userColumns = db.prepare(`PRAGMA table_info(users)`).all().map(c => c.name);
+    if (!userColumns.includes('role')) {
+      db.exec(`ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user'`);
+    }
+    if (!userColumns.includes('api_key')) {
+      db.exec(`ALTER TABLE users ADD COLUMN api_key TEXT`);
+    }
+    if (!userColumns.includes('full_name')) {
+      db.exec(`ALTER TABLE users ADD COLUMN full_name TEXT DEFAULT ''`);
+    }
+    if (!userColumns.includes('allowed_origins')) {
+      db.exec(`ALTER TABLE users ADD COLUMN allowed_origins TEXT DEFAULT NULL`);
+    }
+    db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key) WHERE api_key IS NOT NULL`);
+  } catch (err) {
+    console.warn('[Database] User columns migration notice:', err.message);
   }
-  if (!userColumns.includes('api_key')) {
-    db.exec(`ALTER TABLE users ADD COLUMN api_key TEXT`);
-  }
-  if (!userColumns.includes('full_name')) {
-    db.exec(`ALTER TABLE users ADD COLUMN full_name TEXT DEFAULT ''`);
-  }
-  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_api_key ON users(api_key) WHERE api_key IS NOT NULL`);
-} catch (err) {
-  console.warn('[Database] User columns migration notice:', err.message);
 }
 
-// Migration: Ensure 'username' column exists in access_logs table
-try {
-  const logColumns = db.prepare(`PRAGMA table_info(access_logs)`).all().map(c => c.name);
-  if (!logColumns.includes('username')) {
-    db.exec(`ALTER TABLE access_logs ADD COLUMN username TEXT DEFAULT '-'`);
+function initLogSchema() {
+  logDb.exec(`
+    PRAGMA journal_mode = WAL;
+    PRAGMA synchronous = NORMAL;
+
+    CREATE TABLE IF NOT EXISTS access_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      timestamp TEXT NOT NULL,
+      date TEXT NOT NULL,
+      ip TEXT NOT NULL,
+      method TEXT NOT NULL,
+      url TEXT NOT NULL,
+      status INTEGER NOT NULL,
+      duration_ms INTEGER NOT NULL,
+      origin TEXT DEFAULT '-',
+      result TEXT NOT NULL,
+      is_success INTEGER NOT NULL,
+      username TEXT DEFAULT '-'
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_logs_date ON access_logs(date);
+    CREATE INDEX IF NOT EXISTS idx_logs_timestamp ON access_logs(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_logs_status ON access_logs(status);
+    CREATE INDEX IF NOT EXISTS idx_logs_ip ON access_logs(ip);
+    CREATE INDEX IF NOT EXISTS idx_logs_origin ON access_logs(origin);
+  `);
+
+  // Migration: Ensure 'username' column exists in access_logs table in logDb
+  try {
+    const logColumns = logDb.prepare(`PRAGMA table_info(access_logs)`).all().map(c => c.name);
+    if (!logColumns.includes('username')) {
+      logDb.exec(`ALTER TABLE access_logs ADD COLUMN username TEXT DEFAULT '-'`);
+    }
+  } catch (err) {
+    console.warn('[Database] Access logs columns migration notice:', err.message);
   }
-} catch (err) {
-  console.warn('[Database] Access logs columns migration notice:', err.message);
 }
 
-// Seed default app settings if not already present
-const seedSettings = [
-  ['app_name',    'ALTCHA Manager'],
-  ['app_tagline', 'Self-Hosted CAPTCHA Service'],
-  ['app_url',     'http://localhost:8000'],
-  ['app_port',    '8000'],
-  ['app_footer',  'Copyright \u00a9 2026 ALTCHA Manager. All rights reserved.']
-];
-const seedStmt = db.prepare(
-  `INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`
-);
-const now = new Date().toISOString();
-for (const [key, value] of seedSettings) {
-  seedStmt.run(key, value, now);
+function seedDefaultSettings() {
+  const seedSettings = [
+    ['app_name', 'ALTCHA Manager'],
+    ['app_tagline', 'Self-Hosted CAPTCHA Service'],
+    ['app_url', 'http://localhost:8000'],
+    ['app_port', '8000'],
+    ['app_footer', 'Copyright \u00a9 2026 ALTCHA Manager. All rights reserved.']
+  ];
+  const seedStmt = db.prepare(
+    `INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`
+  );
+  const now = new Date().toISOString();
+  for (const [key, value] of seedSettings) {
+    seedStmt.run(key, value, now);
+  }
 }
 
-// Seed default admin user (username: admin, password: admin12345, role: administrator)
-{
-  const adminUser = db.prepare('SELECT id, role, api_key, full_name FROM users WHERE username = ?').get('admin');
-  if (!adminUser) {
-    const defaultHash = bcrypt.hashSync('admin12345', 12);
-    const defaultKey = 'altcha_key_' + crypto.randomBytes(16).toString('hex');
+function seedDefaultAdmin() {
+  const adminUsername = (process.env.ADMIN_USERNAME || process.env.ADMIN_USER || 'admin').trim();
+  const adminPassword = process.env.ADMIN_PASSWORD || 'admin12345';
+  const adminFullName = (process.env.ADMIN_FULL_NAME || 'Administrator').trim();
+  const now = new Date().toISOString();
+
+  const existingAdmin = db.prepare(
+    'SELECT id, username, role, api_key, allowed_origins FROM users WHERE username = ? OR role = ? LIMIT 1'
+  ).get(adminUsername, 'administrator');
+
+  if (!existingAdmin) {
+    const defaultHash = bcrypt.hashSync(adminPassword, 12);
+    const defaultKey = process.env.ADMIN_API_KEY || ('altcha_key_' + crypto.randomBytes(16).toString('hex'));
+    const defaultOrigins = JSON.stringify(['*']); // Allow wildcard so admin key works immediately
     db.prepare(
-      `INSERT INTO users (username, full_name, password_hash, role, api_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ).run('admin', 'Administrator', defaultHash, 'administrator', defaultKey, now, now);
-    console.log('[Database] Default admin user created (username: admin, password: admin12345, role: administrator). Change this in production!');
+      `INSERT INTO users (username, full_name, password_hash, role, api_key, allowed_origins, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(adminUsername, adminFullName, defaultHash, 'administrator', defaultKey, defaultOrigins, now, now);
+
+    console.log('======================================================================');
+    console.log('[ALTCHA Database] Database populated & Administrator account created!');
+    console.log('----------------------------------------------------------------------');
+    console.log(`  Username : ${adminUsername}`);
+    console.log(`  Password : ${adminPassword}`);
+    console.log(`  Role     : administrator`);
+    console.log(`  API Key  : ${defaultKey}`);
+    console.log(`  Origins  : Wildcard (*)`);
+    console.log('  NOTE: Please change this default password after logging in.');
+    console.log('======================================================================');
   } else {
-    // Ensure admin user has administrator role, an api_key, and full_name
+    // Ensure administrator has administrator role, an api_key, and full_name
     const updates = [];
     const params = [];
-    if (adminUser.role !== 'administrator') {
+    if (existingAdmin.role !== 'administrator') {
       updates.push('role = ?');
       params.push('administrator');
     }
-    if (!adminUser.api_key) {
+    if (!existingAdmin.api_key) {
       updates.push('api_key = ?');
-      params.push('altcha_key_' + crypto.randomBytes(16).toString('hex'));
-    }
-    if (!adminUser.full_name) {
-      updates.push('full_name = ?');
-      params.push('Administrator');
+      params.push(process.env.ADMIN_API_KEY || ('altcha_key_' + crypto.randomBytes(16).toString('hex')));
     }
     if (updates.length > 0) {
-      params.push('admin');
-      db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE username = ?`).run(...params);
+      params.push(existingAdmin.id);
+      db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
     }
   }
 }
 
+// Run initializations immediately on module load
+initMainSchema();
+initLogSchema();
+seedDefaultSettings();
+seedDefaultAdmin();
+
 // Prepared Statements
-const insertLogStmt = db.prepare(`
+const insertLogStmt = logDb.prepare(`
   INSERT INTO access_logs (
     timestamp, date, ip, method, url, status, duration_ms, origin, result, is_success, username
   ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -161,6 +207,7 @@ const insertLogStmt = db.prepare(`
 
 export const SentinelDB = {
   db,
+  logDb,
 
   /**
    * Insert a new access log record
@@ -191,7 +238,7 @@ export const SentinelDB = {
    */
   getAvailableDates() {
     try {
-      const stmt = db.prepare(`SELECT DISTINCT date FROM access_logs ORDER BY date DESC`);
+      const stmt = logDb.prepare(`SELECT DISTINCT date FROM access_logs ORDER BY date DESC`);
       const rows = stmt.all();
       return rows.map((r) => r.date);
     } catch (err) {
@@ -211,7 +258,7 @@ export const SentinelDB = {
         : (dates[0] || new Date().toLocaleDateString('sv-SE'));
 
       // 1. Total Requests & Average Latency
-      const totalStmt = db.prepare(`
+      const totalStmt = logDb.prepare(`
         SELECT COUNT(*) as total, COALESCE(AVG(duration_ms), 0) as avg_duration
         FROM access_logs
         WHERE date = ?
@@ -221,13 +268,13 @@ export const SentinelDB = {
       const avgLatencyMs = Math.round(totalRow.avg_duration);
 
       // 2. Challenges & Verifications
-      const challengesStmt = db.prepare(`
+      const challengesStmt = logDb.prepare(`
         SELECT COUNT(*) as count FROM access_logs
         WHERE date = ? AND url LIKE '%/challenge%'
       `);
       const challengesCount = (challengesStmt.get(date) || { count: 0 }).count;
 
-      const verifyStmt = db.prepare(`
+      const verifyStmt = logDb.prepare(`
         SELECT COUNT(*) as count, COALESCE(SUM(is_success), 0) as verified_success
         FROM access_logs
         WHERE date = ? AND url LIKE '%/verify%'
@@ -237,18 +284,18 @@ export const SentinelDB = {
       const verifiedSuccess = verifyRow.verified_success;
 
       // 3. Blocked & Rate Limited
-      const blockedStmt = db.prepare(`
+      const blockedStmt = logDb.prepare(`
         SELECT COUNT(*) as count FROM access_logs WHERE date = ? AND status = 403
       `);
       const blockedCount = (blockedStmt.get(date) || { count: 0 }).count;
 
-      const rateLimitedStmt = db.prepare(`
+      const rateLimitedStmt = logDb.prepare(`
         SELECT COUNT(*) as count FROM access_logs WHERE date = ? AND status = 429
       `);
       const rateLimitedCount = (rateLimitedStmt.get(date) || { count: 0 }).count;
 
       // 4. Status Counts
-      const statusStmt = db.prepare(`
+      const statusStmt = logDb.prepare(`
         SELECT status, COUNT(*) as count FROM access_logs WHERE date = ? GROUP BY status
       `);
       const statusRows = statusStmt.all(date) || [];
@@ -258,7 +305,7 @@ export const SentinelDB = {
       });
 
       // 5. Top Origins
-      const originsStmt = db.prepare(`
+      const originsStmt = logDb.prepare(`
         SELECT origin, COUNT(*) as count
         FROM access_logs
         WHERE date = ?
@@ -272,7 +319,7 @@ export const SentinelDB = {
       }));
 
       // 6. Top Client IPs
-      const ipsStmt = db.prepare(`
+      const ipsStmt = logDb.prepare(`
         SELECT ip, COUNT(*) as count
         FROM access_logs
         WHERE date = ?
@@ -292,7 +339,7 @@ export const SentinelDB = {
         hourlyMap[hh] = { hour: hh, count: 0, success: 0, errors: 0 };
       }
 
-      const hourlyStmt = db.prepare(`
+      const hourlyStmt = logDb.prepare(`
         SELECT CASE
                  WHEN timestamp LIKE '%Z' THEN strftime('%H', timestamp, '+8 hours')
                  ELSE substr(timestamp, 12, 2)
@@ -325,7 +372,7 @@ export const SentinelDB = {
         statusCounts,
         topOrigins,
         topIps,
-        hourlyActivity: Object.values(hourlyMap)
+        hourlyActivity: Object.values(hourlyMap).sort((a, b) => parseInt(a.hour, 10) - parseInt(b.hour, 10))
       };
     } catch (err) {
       console.error('[Database] Error computing stats:', err.message);
@@ -363,7 +410,7 @@ export const SentinelDB = {
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
       // Count total
-      const countStmt = db.prepare(`SELECT COUNT(*) as total FROM access_logs ${whereClause}`);
+      const countStmt = logDb.prepare(`SELECT COUNT(*) as total FROM access_logs ${whereClause}`);
       const countRow = countStmt.get(...params);
       const total = countRow ? countRow.total : 0;
 
@@ -373,7 +420,7 @@ export const SentinelDB = {
       const offset = (pageNum - 1) * limitNum;
 
       // Fetch logs
-      const queryStmt = db.prepare(`
+      const queryStmt = logDb.prepare(`
         SELECT id, timestamp, ip, method, url, status, duration_ms as durationMs,
                (duration_ms || 'ms') as duration, origin, result, is_success as isSuccess,
                COALESCE(username, '-') as username
@@ -395,81 +442,6 @@ export const SentinelDB = {
     } catch (err) {
       console.error('[Database] Error fetching logs:', err.message);
       return { total: 0, page: 1, limit: 50, totalPages: 1, logs: [] };
-    }
-  },
-
-  /**
-   * Auto-migrate existing log files from log/ directory to SQLite
-   */
-  migrateFromLogFiles(logDir) {
-    if (!fs.existsSync(logDir)) return 0;
-
-    try {
-      const countStmt = db.prepare(`SELECT COUNT(*) as count FROM access_logs`);
-      const existingCount = (countStmt.get() || { count: 0 }).count;
-      if (existingCount > 0) {
-        // Database already populated
-        return 0;
-      }
-
-      const files = fs.readdirSync(logDir);
-      let totalMigrated = 0;
-
-      for (const f of files) {
-        if (!f.endsWith('.log')) continue;
-        const filePath = path.join(logDir, f);
-        const content = fs.readFileSync(filePath, 'utf8');
-        const lines = content.split('\n').filter(Boolean);
-
-        db.exec('BEGIN TRANSACTION;');
-        for (const line of lines) {
-          const parts = line.split(' | ').map((p) => p.trim());
-          if (parts.length < 7) continue;
-
-          const timestamp = parts[0];
-          const ip = parts[1];
-          const methodUrl = parts[2];
-          const status = parseInt(parts[3], 10) || 0;
-          const duration = parts[4];
-          const durationMs = parseInt(duration, 10) || 0;
-          const originPart = parts[5];
-          const origin = originPart.startsWith('Origin: ') ? originPart.substring(8) : originPart;
-          const result = parts.slice(6).join(' | ');
-
-          const [method, ...urlParts] = methodUrl.split(' ');
-          const url = urlParts.join(' ');
-          const isAltcha = url.includes('/challenge') || url.includes('/verify');
-          if (!isAltcha) continue;
-
-          const isSuccess = result === 'Success' || result === 'SUCCESS' || (status >= 200 && status < 400 && !result.startsWith('ERROR') && !result.startsWith('Fail'));
-
-          this.insertLog({
-            timestamp,
-            ip,
-            method,
-            url,
-            status,
-            durationMs,
-            origin,
-            result,
-            isSuccess
-          });
-          totalMigrated++;
-        }
-        db.exec('COMMIT;');
-      }
-
-      if (totalMigrated > 0) {
-        console.log(`[Database] Successfully migrated ${totalMigrated} access log records from files into SQLite.`);
-      }
-
-      return totalMigrated;
-    } catch (err) {
-      console.error('[Database] Migration from log files failed:', err.message);
-      try {
-        db.exec('ROLLBACK;');
-      } catch { }
-      return 0;
     }
   },
 
@@ -551,7 +523,7 @@ export const SentinelDB = {
   getAllUsers() {
     try {
       return db.prepare(`
-        SELECT id, username, full_name, role, api_key, created_at, updated_at
+        SELECT id, username, full_name, role, api_key, allowed_origins, created_at, updated_at
         FROM users
         ORDER BY id ASC
       `).all() || [];
@@ -567,7 +539,7 @@ export const SentinelDB = {
   getUserById(id) {
     try {
       return db.prepare(`
-        SELECT id, username, full_name, role, api_key, created_at, updated_at
+        SELECT id, username, full_name, role, api_key, allowed_origins, created_at, updated_at
         FROM users WHERE id = ?
       `).get(id) || null;
     } catch (err) {
@@ -595,7 +567,7 @@ export const SentinelDB = {
     try {
       if (!apiKey) return null;
       return db.prepare(`
-        SELECT id, username, full_name, role, api_key, created_at, updated_at
+        SELECT id, username, full_name, role, api_key, allowed_origins, created_at, updated_at
         FROM users WHERE api_key = ?
       `).get(apiKey) || null;
     } catch (err) {
@@ -607,25 +579,29 @@ export const SentinelDB = {
   /**
    * Create a new user
    */
-  createUser({ username, password, role = 'user', apiKey = null, fullName = '' }) {
+  createUser({ username, password, role = 'user', apiKey = null, fullName = '', allowedOrigins = null }) {
     try {
       const now = new Date().toISOString();
       const passwordHash = bcrypt.hashSync(password, 12);
       const key = apiKey || this.generateApiKey();
       const userRole = role === 'administrator' ? 'administrator' : 'user';
       const cleanFullName = (fullName || '').trim();
+      const originsJson = Array.isArray(allowedOrigins) && allowedOrigins.length > 0
+        ? JSON.stringify(allowedOrigins.map(o => o.trim()).filter(Boolean))
+        : null;
 
       const stmt = db.prepare(`
-        INSERT INTO users (username, full_name, password_hash, role, api_key, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO users (username, full_name, password_hash, role, api_key, allowed_origins, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      const res = stmt.run(username.trim(), cleanFullName, passwordHash, userRole, key, now, now);
+      const res = stmt.run(username.trim(), cleanFullName, passwordHash, userRole, key, originsJson, now, now);
       return {
         id: Number(res.lastInsertRowid),
         username: username.trim(),
         full_name: cleanFullName,
         role: userRole,
         api_key: key,
+        allowed_origins: originsJson,
         created_at: now,
         updated_at: now
       };
@@ -638,7 +614,7 @@ export const SentinelDB = {
   /**
    * Update a user's details
    */
-  updateUser(id, { username, password, role, apiKey, fullName }) {
+  updateUser(id, { username, password, role, apiKey, fullName, allowedOrigins }) {
     try {
       const existing = this.getUserById(id);
       if (!existing) return null;
@@ -666,6 +642,13 @@ export const SentinelDB = {
       if (apiKey !== undefined) {
         fields.push('api_key = ?');
         values.push(apiKey);
+      }
+      if (allowedOrigins !== undefined) {
+        fields.push('allowed_origins = ?');
+        const originsJson = Array.isArray(allowedOrigins) && allowedOrigins.length > 0
+          ? JSON.stringify(allowedOrigins.map(o => o.trim()).filter(Boolean))
+          : null;
+        values.push(originsJson);
       }
 
       fields.push('updated_at = ?');
@@ -755,7 +738,7 @@ export const SentinelDB = {
     try {
       if (!token) return null;
       const row = db.prepare(`
-        SELECT s.token, s.expires_at, u.id, u.username, u.full_name, u.role, u.api_key
+        SELECT s.token, s.expires_at, u.id, u.username, u.full_name, u.role, u.api_key, u.allowed_origins
         FROM sessions s
         JOIN users u ON u.id = s.user_id
         WHERE s.token = ?
@@ -766,12 +749,19 @@ export const SentinelDB = {
         this.deleteSession(token);
         return null;
       }
+
+      let allowedOrigins = null;
+      if (row.allowed_origins) {
+        try { allowedOrigins = JSON.parse(row.allowed_origins); } catch { allowedOrigins = null; }
+      }
+
       return {
         id: row.id,
         username: row.username,
         fullName: row.full_name || '',
         role: row.role || 'user',
-        apiKey: row.api_key
+        apiKey: row.api_key,
+        allowedOrigins
       };
     } catch (err) {
       console.error('[Database] Error fetching session:', err.message);
@@ -804,6 +794,22 @@ export const SentinelDB = {
     } catch (err) {
       console.error('[Database] Error cleaning sessions:', err.message);
       return 0;
+    }
+  },
+
+  /**
+   * Ensure database schemas, default settings, and admin account are populated
+   */
+  ensureInitialized() {
+    try {
+      initMainSchema();
+      initLogSchema();
+      seedDefaultSettings();
+      seedDefaultAdmin();
+      return true;
+    } catch (err) {
+      console.error('[Database] Failed to ensure database initialization:', err.message);
+      return false;
     }
   },
 };

@@ -2,28 +2,27 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-// Load .env automatically if supported in Node.js >= 20.6
-if (typeof process.loadEnvFile === 'function') {
-  try {
-    process.loadEnvFile();
-  } catch { }
-}
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Project root directory is one level above src/
 export const ROOT_DIR = path.resolve(__dirname, '..');
 
+// Load .env automatically from project root if supported in Node.js >= 20.6
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile(path.join(ROOT_DIR, '.env'));
+  } catch { }
+}
+
 export const PATHS = {
   root: ROOT_DIR,
   src: __dirname,
   databaseDir: process.env.DATA_DIR || path.join(ROOT_DIR, 'database'),
   databaseFile: process.env.DB_FILE || path.join(process.env.DATA_DIR || path.join(ROOT_DIR, 'database'), 'altcha.db'),
-  logDir: process.env.LOG_DIR || path.join(ROOT_DIR, 'log'),
+  logDatabaseFile: process.env.LOG_DB_FILE || path.join(process.env.DATA_DIR || path.join(ROOT_DIR, 'database'), 'log.altcha.db'),
   webDir: process.env.WEB_DIR || path.join(ROOT_DIR, 'web'),
-  whitelistFile: process.env.WHITELIST_FILE || (fs.existsSync(path.join(ROOT_DIR, 'config', 'whitelist.json')) ? path.join(ROOT_DIR, 'config', 'whitelist.json') : path.join(ROOT_DIR, 'whitelist.json')),
-  toolsDir: path.join(ROOT_DIR, 'tools'),
+  envFile: path.join(ROOT_DIR, '.env')
 };
 
 export const CONFIG = {
@@ -36,9 +35,9 @@ export const CONFIG = {
   expiresIn: parseInt(process.env.EXPIRES_IN, 10) || 300,
   corsOrigin: process.env.CORS_ORIGIN || '*',
   trustProxy: process.env.TRUST_PROXY || '1',
-  redisUrl: process.env.REDIS_URL || '',
-  redisRetryAttempts: parseInt(process.env.REDIS_RETRY_ATTEMPTS, 10) || 5,
-  redisRetryDelayMs: parseInt(process.env.REDIS_RETRY_DELAY_MS, 10) || 2000,
+  redisUrl: (process.env.REDIS_URL || '').trim(),
+  redisRetryAttempts: !isNaN(Number(process.env.REDIS_RETRY_ATTEMPTS)) ? Number(process.env.REDIS_RETRY_ATTEMPTS) : 5,
+  redisRetryDelayMs: parseInt(process.env.REDIS_RETRY_DELAY_MS, 10) || 500,
   rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false',
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60000,
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX, 10) || 15,
