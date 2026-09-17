@@ -263,52 +263,60 @@ export const SentinelDB = {
   getStats(targetDate = '') {
     try {
       const dates = this.getAvailableDates();
-      const date = targetDate && dates.includes(targetDate)
-        ? targetDate
-        : (dates[0] || new Date().toLocaleDateString('sv-SE'));
+      const isAll = targetDate === 'all';
+      let date = null;
+      if (!isAll) {
+        date = targetDate && dates.includes(targetDate)
+          ? targetDate
+          : (dates[0] || new Date().toLocaleDateString('sv-SE'));
+      }
+
+      const dateClause = isAll ? '' : 'WHERE date = ?';
+      const dateParams = isAll ? [] : [date];
+      const andDateClause = isAll ? '' : 'AND date = ?';
 
       // 1. Total Requests & Average Latency
       const totalStmt = logDb.prepare(`
         SELECT COUNT(*) as total, COALESCE(AVG(duration_ms), 0) as avg_duration
         FROM access_logs
-        WHERE date = ?
+        ${dateClause}
       `);
-      const totalRow = totalStmt.get(date) || { total: 0, avg_duration: 0 };
+      const totalRow = totalStmt.get(...dateParams) || { total: 0, avg_duration: 0 };
       const totalRequests = totalRow.total;
       const avgLatencyMs = Math.round(totalRow.avg_duration);
 
       // 2. Challenges & Verifications
       const challengesStmt = logDb.prepare(`
         SELECT COUNT(*) as count FROM access_logs
-        WHERE date = ? AND url LIKE '%/challenge%'
+        WHERE url LIKE '%/challenge%' ${andDateClause}
       `);
-      const challengesCount = (challengesStmt.get(date) || { count: 0 }).count;
+      const challengesCount = (challengesStmt.get(...dateParams) || { count: 0 }).count;
 
       const verifyStmt = logDb.prepare(`
         SELECT COUNT(*) as count, COALESCE(SUM(is_success), 0) as verified_success
         FROM access_logs
-        WHERE date = ? AND url LIKE '%/verify%'
+        WHERE url LIKE '%/verify%' ${andDateClause}
       `);
-      const verifyRow = verifyStmt.get(date) || { count: 0, verified_success: 0 };
+      const verifyRow = verifyStmt.get(...dateParams) || { count: 0, verified_success: 0 };
       const verificationsCount = verifyRow.count;
       const verifiedSuccess = verifyRow.verified_success;
 
       // 3. Blocked & Rate Limited
       const blockedStmt = logDb.prepare(`
-        SELECT COUNT(*) as count FROM access_logs WHERE date = ? AND status = 403
+        SELECT COUNT(*) as count FROM access_logs WHERE status = 403 ${andDateClause}
       `);
-      const blockedCount = (blockedStmt.get(date) || { count: 0 }).count;
+      const blockedCount = (blockedStmt.get(...dateParams) || { count: 0 }).count;
 
       const rateLimitedStmt = logDb.prepare(`
-        SELECT COUNT(*) as count FROM access_logs WHERE date = ? AND status = 429
+        SELECT COUNT(*) as count FROM access_logs WHERE status = 429 ${andDateClause}
       `);
-      const rateLimitedCount = (rateLimitedStmt.get(date) || { count: 0 }).count;
+      const rateLimitedCount = (rateLimitedStmt.get(...dateParams) || { count: 0 }).count;
 
       // 4. Status Counts
       const statusStmt = logDb.prepare(`
-        SELECT status, COUNT(*) as count FROM access_logs WHERE date = ? GROUP BY status
+        SELECT status, COUNT(*) as count FROM access_logs ${dateClause} GROUP BY status
       `);
-      const statusRows = statusStmt.all(date) || [];
+      const statusRows = statusStmt.all(...dateParams) || [];
       const statusCounts = {};
       statusRows.forEach((r) => {
         statusCounts[String(r.status)] = r.count;
@@ -318,12 +326,12 @@ export const SentinelDB = {
       const originsStmt = logDb.prepare(`
         SELECT origin, COUNT(*) as count
         FROM access_logs
-        WHERE date = ?
+        ${dateClause}
         GROUP BY origin
         ORDER BY count DESC
         LIMIT 10
       `);
-      const topOrigins = (originsStmt.all(date) || []).map((r) => ({
+      const topOrigins = (originsStmt.all(...dateParams) || []).map((r) => ({
         origin: r.origin,
         count: r.count
       }));
@@ -332,12 +340,12 @@ export const SentinelDB = {
       const ipsStmt = logDb.prepare(`
         SELECT ip, COUNT(*) as count
         FROM access_logs
-        WHERE date = ?
+        ${dateClause}
         GROUP BY ip
         ORDER BY count DESC
         LIMIT 10
       `);
-      const topIps = (ipsStmt.all(date) || []).map((r) => ({
+      const topIps = (ipsStmt.all(...dateParams) || []).map((r) => ({
         ip: r.ip,
         count: r.count
       }));
@@ -358,10 +366,10 @@ export const SentinelDB = {
                COALESCE(SUM(is_success), 0) as success,
                COALESCE(SUM(CASE WHEN is_success = 0 THEN 1 ELSE 0 END), 0) as errors
         FROM access_logs
-        WHERE date = ?
+        ${dateClause}
         GROUP BY hh
       `);
-      const hourlyRows = hourlyStmt.all(date) || [];
+      const hourlyRows = hourlyStmt.all(...dateParams) || [];
       hourlyRows.forEach((r) => {
         if (r.hh && hourlyMap[r.hh]) {
           hourlyMap[r.hh].count = r.count;
@@ -371,7 +379,7 @@ export const SentinelDB = {
       });
 
       return {
-        date,
+        date: isAll ? 'all' : date,
         totalRequests,
         avgLatencyMs,
         challengesCount,
@@ -396,7 +404,14 @@ export const SentinelDB = {
   getLogs({ date = '', status = null, search = '', page = 1, limit = 50 }) {
     try {
       const dates = this.getAvailableDates();
-      const targetDate = date && dates.includes(date) ? date : (dates[0] || null);
+      let targetDate = null;
+      if (date === 'all') {
+        targetDate = null;
+      } else if (date) {
+        targetDate = dates.includes(date) ? date : date;
+      } else if (date === undefined) {
+        targetDate = dates[0] || null;
+      }
 
       const conditions = [];
       const params = [];
@@ -452,6 +467,79 @@ export const SentinelDB = {
     } catch (err) {
       console.error('[Database] Error fetching logs:', err.message);
       return { total: 0, page: 1, limit: 50, totalPages: 1, logs: [] };
+    }
+  },
+
+  /**
+   * Delete access logs based on range and options
+   * @param {Object} params
+   * @param {'all'|'date'|'older_than_24h'|'older_than_7d'|'older_than_30d'|'older_than_90d'|'before_date'} params.range
+   * @param {string} [params.date] - Date in YYYY-MM-DD
+   * @param {string} [params.beforeDate] - Date in YYYY-MM-DD
+   * @returns {{ success: boolean, deletedCount: number }}
+   */
+  deleteLogs({ range = 'all', date = '', beforeDate = '' } = {}) {
+    try {
+      let deletedCount = 0;
+      if (range === 'all') {
+        const countRow = logDb.prepare(`SELECT COUNT(*) as total FROM access_logs`).get();
+        deletedCount = countRow ? countRow.total : 0;
+        logDb.exec(`DELETE FROM access_logs;`);
+        try {
+          logDb.prepare(`DELETE FROM sqlite_sequence WHERE name = 'access_logs'`).run();
+        } catch {
+          // sqlite_sequence might not exist or have the record yet
+        }
+        try {
+          logDb.exec('VACUUM;');
+        } catch (vErr) {
+          console.warn('[Database] VACUUM error:', vErr.message);
+        }
+      } else if (range === 'date') {
+        if (!date || !date.trim()) {
+          throw new Error('Tanggal (date) harus ditentukan untuk penghapusan per tanggal.');
+        }
+        const stmt = logDb.prepare(`DELETE FROM access_logs WHERE date = ?`);
+        const info = stmt.run(date.trim());
+        deletedCount = info.changes;
+      } else if (range === 'older_than_24h') {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const stmt = logDb.prepare(`DELETE FROM access_logs WHERE timestamp < ?`);
+        const info = stmt.run(cutoff);
+        deletedCount = info.changes;
+      } else if (range === 'older_than_7d') {
+        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const stmt = logDb.prepare(`DELETE FROM access_logs WHERE timestamp < ?`);
+        const info = stmt.run(cutoff);
+        deletedCount = info.changes;
+      } else if (range === 'older_than_30d') {
+        const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const stmt = logDb.prepare(`DELETE FROM access_logs WHERE timestamp < ?`);
+        const info = stmt.run(cutoff);
+        deletedCount = info.changes;
+      } else if (range === 'older_than_90d') {
+        const cutoff = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+        const stmt = logDb.prepare(`DELETE FROM access_logs WHERE timestamp < ?`);
+        const info = stmt.run(cutoff);
+        deletedCount = info.changes;
+      } else if (range === 'before_date') {
+        if (!beforeDate || !beforeDate.trim()) {
+          throw new Error('Tanggal batas (beforeDate) harus ditentukan.');
+        }
+        const stmt = logDb.prepare(`DELETE FROM access_logs WHERE date < ?`);
+        const info = stmt.run(beforeDate.trim());
+        deletedCount = info.changes;
+      } else {
+        throw new Error(`Rentang waktu penghapusan tidak valid: '${range}'`);
+      }
+
+      return {
+        success: true,
+        deletedCount
+      };
+    } catch (err) {
+      console.error('[Database] Error deleting logs:', err.message);
+      throw err;
     }
   },
 

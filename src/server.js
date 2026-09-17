@@ -710,6 +710,20 @@ app.get('/api/sentinel/logs/dates', requireAuth, (req, res) => {
   res.json(SentinelDB.getAvailableDates());
 });
 
+app.delete('/api/sentinel/logs', requireAuth, requireAdmin, (req, res) => {
+  try {
+    const { range = 'all', date, beforeDate } = req.body || {};
+    const result = SentinelDB.deleteLogs({ range, date, beforeDate });
+    res.json({
+      success: true,
+      message: `Berhasil menghapus ${result.deletedCount} data log.`,
+      deletedCount: result.deletedCount
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message || 'Gagal menghapus data log.' });
+  }
+});
+
 app.get('/api/sentinel/config', requireAuth, (req, res) => {
   res.json({
     algorithm: CONFIG.algorithm,
