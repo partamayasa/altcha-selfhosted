@@ -125,6 +125,7 @@
           <div class="mb-3">
             <altcha-widget
               id="altcha-widget"
+              challenge="/api/auth/challenge"
               challengeurl="/api/auth/challenge"
               configuration='{"hideFooter": true}'
               style="--altcha-border-radius: var(--bs-border-radius, 0.375rem); --altcha-border-color: var(--bs-border-color); --altcha-color-border-focus: var(--bs-primary); --altcha-color-base: var(--bs-body-bg); --altcha-color-text: var(--bs-body-color); --altcha-label-color: var(--bs-secondary-color); --altcha-padding: 0.375rem 0.75rem; --altcha-max-width: 100%; width: 100%; display: block;"
@@ -437,6 +438,13 @@
             const data = await res.json().catch(function () { return {}; });
 
             if (res.ok && data.success) {
+              try {
+                sessionStorage.setItem('sentinel_auth_session', JSON.stringify({
+                  username: username,
+                  role: data.role || 'administrator',
+                  fullName: data.full_name || data.fullName || username || 'Administrator'
+                }));
+              } catch (e) {}
               if (data.role === 'user') {
                 window.location.replace('integration');
               } else {
