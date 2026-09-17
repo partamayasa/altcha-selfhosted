@@ -93,7 +93,7 @@
 <body class="login-page bg-body-secondary">
   <main class="login-box">
     <h1 class="login-logo">
-      <a href="index.html" id="login-app-logo">ALTCHA Manager</a>
+      <a href="./index" id="login-app-logo">ALTCHA Manager</a>
     </h1>
     <!-- /.login-logo -->
     <div class="card card-outline card-primary shadow-sm">
@@ -120,6 +120,17 @@
               <span class="bi bi-lock-fill"></span>
             </div>
           </div>
+
+          <!--begin::ALTCHA CAPTCHA-->
+          <div class="mb-3">
+            <altcha-widget
+              id="altcha-widget"
+              challengeurl="/api/auth/challenge"
+              configuration='{"hideFooter": true}'
+              style="--altcha-border-radius: var(--bs-border-radius, 0.375rem); --altcha-border-color: var(--bs-border-color); --altcha-color-border-focus: var(--bs-primary); --altcha-color-base: var(--bs-body-bg); --altcha-color-text: var(--bs-body-color); --altcha-label-color: var(--bs-secondary-color); --altcha-padding: 0.375rem 0.75rem; --altcha-max-width: 100%; width: 100%; display: block;"
+            ></altcha-widget>
+          </div>
+          <!--end::ALTCHA CAPTCHA-->
           <!--begin::Row-->
           <div class="row align-items-center mb-3">
             <div class="col-7">
@@ -156,6 +167,9 @@
   <!--end::Required Plugin(Bootstrap 5)--><!--begin::Required Plugin(AdminLTE)-->
   <script src="js/adminlte.js"></script>
   <!--end::Required Plugin(AdminLTE)-->
+  <!--begin::ALTCHA Widget-->
+  <script src="/altcha.min.js" async defer></script>
+  <!--end::ALTCHA Widget-->
   <!--begin::App Settings Loader-->
   <script>
     // Fetch app settings from server and apply to title + login logo
@@ -270,7 +284,7 @@
       fetch('/api/auth/me', { credentials: 'same-origin' })
         .then(function (res) {
           if (res.ok) {
-            window.location.replace('index.html');
+            window.location.replace('./index');
           }
         })
         .catch(function () {});
@@ -306,6 +320,88 @@
         }
       }
 
+      // Ensure widget matches the exact height and layout of input fields
+      function applyWidgetInputStyle() {
+        const widget = document.getElementById('altcha-widget');
+        if (!widget || !widget.shadowRoot) return;
+        if (widget.shadowRoot.querySelector('#compact-input-style')) return;
+
+        const style = document.createElement('style');
+        style.id = 'compact-input-style';
+        style.textContent = `
+          .altcha-main {
+            min-height: calc(1.5em + 0.75rem + 2px) !important;
+            height: calc(1.5em + 0.75rem + 2px) !important;
+            box-sizing: border-box !important;
+            display: flex !important;
+            align-items: center !important;
+            padding: 0.375rem 0.75rem !important;
+            border-radius: var(--altcha-border-radius, 0.375rem) !important;
+            background-color: var(--altcha-color-base, var(--bs-body-bg)) !important;
+            border: 1px solid var(--altcha-border-color, var(--bs-border-color)) !important;
+          }
+          .altcha-main > div:first-child {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
+            width: 100% !important;
+            height: 100% !important;
+          }
+          .altcha-checkbox-wrap {
+            display: flex !important;
+            align-items: center !important;
+            gap: 0.5rem !important;
+            font-size: 0.95rem !important;
+          }
+          .altcha-footer {
+            display: none !important;
+          }
+        `;
+        widget.shadowRoot.appendChild(style);
+      }
+
+      applyWidgetInputStyle();
+      const styleInterval = setInterval(applyWidgetInputStyle, 100);
+      setTimeout(function () { clearInterval(styleInterval); }, 5000);
+      document.addEventListener('DOMContentLoaded', applyWidgetInputStyle);
+      window.addEventListener('load', applyWidgetInputStyle);
+
+      let altchaPayloadCache = null;
+      const widgetEl = document.getElementById('altcha-widget');
+      if (widgetEl) {
+        widgetEl.addEventListener('verified', function (e) {
+          if (e && e.detail && e.detail.payload) {
+            altchaPayloadCache = e.detail.payload;
+          }
+        });
+        widgetEl.addEventListener('statechange', function (e) {
+          if (e && e.detail && e.detail.state === 'verified' && e.detail.payload) {
+            altchaPayloadCache = e.detail.payload;
+          }
+        });
+      }
+
+      // Helper: get ALTCHA payload value from widget
+      function getAltchaPayload() {
+        const widget = document.getElementById('altcha-widget');
+        if (!widget) return null;
+        if (widget.value) return widget.value;
+        if (widget.shadowRoot) {
+          const hiddenInput = widget.shadowRoot.querySelector('input[type="hidden"]');
+          if (hiddenInput && hiddenInput.value) return hiddenInput.value;
+        }
+        return altchaPayloadCache || null;
+      }
+
+      // Helper: reset ALTCHA widget after failed attempt
+      function resetAltcha() {
+        altchaPayloadCache = null;
+        const widget = document.getElementById('altcha-widget');
+        if (widget && typeof widget.reset === 'function') {
+          widget.reset();
+        }
+      }
+
       if (form) {
         form.addEventListener('submit', async function (e) {
           e.preventDefault();
@@ -319,6 +415,13 @@
             return;
           }
 
+          // Check ALTCHA completion
+          const altchaPayload = getAltchaPayload();
+          if (!altchaPayload) {
+            showError('Please complete the CAPTCHA verification before signing in.');
+            return;
+          }
+
           setLoading(true);
 
           try {
@@ -328,14 +431,14 @@
                 'Content-Type': 'application/json',
               },
               credentials: 'same-origin',
-              body: JSON.stringify({ username, password }),
+              body: JSON.stringify({ username, password, altcha: altchaPayload }),
             });
 
             const data = await res.json().catch(function () { return {}; });
 
             if (res.ok && data.success) {
               if (data.role === 'user') {
-                window.location.replace('keys');
+                window.location.replace('integration');
               } else {
                 window.location.replace('index');
               }
@@ -343,10 +446,12 @@
               showError(data.error || 'Invalid username or password.');
               passwordInput.value = '';
               passwordInput.focus();
+              resetAltcha();
               setLoading(false);
             }
           } catch (err) {
             showError('Connection error. Please try again.');
+            resetAltcha();
             setLoading(false);
           }
         });
