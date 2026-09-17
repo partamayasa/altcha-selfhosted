@@ -93,18 +93,28 @@ const SentinelDashboard = {
       console.warn('[SentinelDashboard] Failed to fetch log dates:', err.message);
     }
 
-    if (!dates || dates.length === 0) {
-      const today = new Date().toLocaleDateString('sv-SE');
-      dates = [today];
-    }
-
+    const currentVal = dashSelect.value;
     dashSelect.innerHTML = '';
-    dates.forEach((d, idx) => {
-      const opt = document.createElement('option');
-      opt.value = d;
-      opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
-      dashSelect.appendChild(opt);
-    });
+
+    // Add 'All Time' option
+    const allOpt = document.createElement('option');
+    allOpt.value = 'all';
+    allOpt.textContent = 'Semua Waktu (All Time)';
+    dashSelect.appendChild(allOpt);
+
+    if (dates && dates.length > 0) {
+      dates.forEach((d, idx) => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
+        if (currentVal ? opt.value === currentVal : idx === 0) {
+          opt.selected = true;
+        }
+        dashSelect.appendChild(opt);
+      });
+    } else {
+      allOpt.selected = true;
+    }
   },
 
   async refresh() {
@@ -119,15 +129,16 @@ const SentinelDashboard = {
       console.warn('[SentinelDashboard] API unavailable or failed, falling back to telemetry dataset:', err.message);
     }
 
-    if (!stats || !stats.totalRequests) {
+    // Only fallback if API request failed completely (e.g. offline static preview)
+    if (stats === null) {
       stats = this.defaultStats;
     }
 
     this.currentStats = stats;
     this.renderMetrics(stats);
-    this.renderActivityChart(stats.hourlyActivity || this.defaultStats.hourlyActivity);
-    this.renderTopOrigins(stats.topOrigins || this.defaultStats.topOrigins);
-    this.renderTopIps(stats.topIps || this.defaultStats.topIps);
+    this.renderActivityChart(stats.hourlyActivity || []);
+    this.renderTopOrigins(stats.topOrigins || []);
+    this.renderTopIps(stats.topIps || []);
     this.renderTelemetry(stats.system || this.defaultStats.system);
   },
 
@@ -139,7 +150,7 @@ const SentinelDashboard = {
 
     const successRate = total > 0 
       ? Math.round(((total - (blocked + rateLimited + (stats.statusCounts?.['500'] || 0))) / total) * 100) 
-      : 100;
+      : 0;
 
     this.animateNumber('metric-total-requests', total);
     this.animateNumber('metric-verifications', verified);
@@ -180,7 +191,12 @@ const SentinelDashboard = {
     if (!chartEl) return;
 
     if (!hourlyData || hourlyData.length === 0) {
-      hourlyData = this.defaultStats.hourlyActivity;
+      hourlyData = Array.from({ length: 24 }, (_, i) => ({
+        hour: String(i).padStart(2, '0'),
+        count: 0,
+        success: 0,
+        errors: 0
+      }));
     }
 
     // Sort chronologically from 00:00 to 23:00
@@ -236,11 +252,15 @@ const SentinelDashboard = {
         },
       },
       yaxis: {
+        min: 0,
+        max: Math.max(...totalRequestsData, 0) > 0 ? undefined : 5,
+        tickAmount: Math.max(...totalRequestsData, 0) > 0 ? undefined : 5,
         labels: {
           style: {
             fontWeight: 400,
           },
           formatter(value) {
+            if (!isFinite(value)) return '0';
             return `${Math.round(value)}`;
           },
         },
@@ -279,7 +299,13 @@ const SentinelDashboard = {
     if (!container) return;
 
     if (!origins || origins.length === 0) {
-      origins = this.defaultStats.topOrigins;
+      container.innerHTML = `
+        <div class="text-center py-4 text-secondary small">
+          <i class="bi bi-globe2 d-block fs-4 mb-2 text-secondary opacity-50"></i>
+          <span>Tidak ada data domain origin</span>
+        </div>
+      `;
+      return;
     }
 
     const total = origins.reduce((acc, curr) => acc + curr.count, 0) || 1;
@@ -330,7 +356,13 @@ const SentinelDashboard = {
     if (!container) return;
 
     if (!ips || ips.length === 0) {
-      ips = this.defaultStats.topIps;
+      container.innerHTML = `
+        <div class="text-center py-4 text-secondary small">
+          <i class="bi bi-router d-block fs-4 mb-2 text-secondary opacity-50"></i>
+          <span>Tidak ada data client IP</span>
+        </div>
+      `;
+      return;
     }
 
     let html = `
