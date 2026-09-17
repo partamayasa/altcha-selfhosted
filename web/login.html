@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+<!--begin::Head-->
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Sign In | ALTCHA Manager</title>
+
+  <!--begin::Theme Init (prevents flash of incorrect theme on load, #6043)-->
+  <script>
+    (() => {
+      'use strict';
+      const root = document.documentElement;
+
+      // Applications with their own theming opt out of AdminLTE's color mode
+      // entirely, here as well as in the bundle.
+      if (root.getAttribute('data-lte-color-mode') === 'off') {
+        return;
+      }
+
+      const STORAGE_KEY = 'lte-theme';
+      let stored = null;
+      try {
+        stored = localStorage.getItem(STORAGE_KEY);
+      } catch {
+        // localStorage may be unavailable (private mode, sandboxed iframe).
+      }
+      // Mirror the precedence in color-mode.ts: the visitor's stored choice
+      // wins, then a theme this page declared itself, then the OS preference.
+      const authored = root.getAttribute('data-bs-theme');
+      let resolved = 'light';
+      if (stored === 'dark' || stored === 'light') {
+        resolved = stored;
+      } else if (authored === 'dark' || authored === 'light') {
+        resolved = authored;
+      } else if (globalThis.matchMedia('(prefers-color-scheme: dark)').matches) {
+        resolved = 'dark';
+      }
+      root.setAttribute('data-bs-theme', resolved);
+      root.style.colorScheme = resolved;
+      // Flag values computed here, so the bundle does not mistake them for a
+      // theme the page declared and stop following the OS preference.
+      if (resolved !== authored) {
+        root.setAttribute('data-lte-theme-resolved', '');
+      }
+    })();
+  </script>
+  <!--end::Theme Init-->
+
+  <!--begin::Accessibility Meta Tags-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#007bff" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#1a1a1a" media="(prefers-color-scheme: dark)" />
+  <!--end::Accessibility Meta Tags-->
+
+  <!--begin::Primary Meta Tags-->
+  <meta name="title" content="Sign In | ALTCHA Manager" />
+  <meta name="author" content="ALTCHA" />
+  <meta name="description"
+    content="Sign in to ALTCHA Manager — a self-hosted, privacy-first CAPTCHA management dashboard." />
+  <!--end::Primary Meta Tags-->
+
+  <!--begin::Accessibility Features-->
+  <!-- Skip links will be dynamically added by accessibility.js -->
+  <meta name="supported-color-schemes" content="light dark" />
+  <link rel="preload" href="css/adminlte.css" as="style" />
+  <!--end::Accessibility Features-->
+
+  <!--begin::Fonts-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css"
+    integrity="sha256-tXJfXfp6Ewt1ilPzLDtQnJV4hclT9XuaZUKyUvmyr+Q=" crossorigin="anonymous" media="print"
+    onload="this.media = 'all'" />
+  <!--end::Fonts-->
+
+  <!--begin::Third Party Plugin(OverlayScrollbars)-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css"
+    crossorigin="anonymous" />
+  <!--end::Third Party Plugin(OverlayScrollbars)-->
+
+  <!--begin::Third Party Plugin(Bootstrap Icons)-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    crossorigin="anonymous" />
+  <!--end::Third Party Plugin(Bootstrap Icons)-->
+
+  <!--begin::Required Plugin(AdminLTE)-->
+  <link rel="stylesheet" href="css/adminlte.css" />
+  <!--end::Required Plugin(AdminLTE)-->
+</head>
+<!--end::Head-->
+<!--begin::Body-->
+
+<body class="login-page bg-body-secondary">
+  <main class="login-box">
+    <h1 class="login-logo">
+      <a href="index.html" id="login-app-logo">ALTCHA Manager</a>
+    </h1>
+    <!-- /.login-logo -->
+    <div class="card card-outline card-primary shadow-sm">
+      <div class="card-body login-card-body">
+        <p class="login-box-msg">Sign in to ALTCHA Manager</p>
+
+        <div id="loginAlert" class="alert alert-danger d-none py-2 mb-3" style="font-size: 0.88rem;" role="alert">
+          <i class="bi bi-exclamation-triangle-fill me-2"></i>
+          <span id="loginAlertText"></span>
+        </div>
+
+        <form id="loginForm" autocomplete="on">
+          <label class="visually-hidden" for="loginUsername">Username</label>
+          <div class="input-group mb-3">
+            <input id="loginUsername" type="text" class="form-control" placeholder="Username" autocomplete="username" required autofocus />
+            <div class="input-group-text">
+              <span class="bi bi-person-fill"></span>
+            </div>
+          </div>
+          <label class="visually-hidden" for="loginPassword">Password</label>
+          <div class="input-group mb-3">
+            <input id="loginPassword" type="password" class="form-control" placeholder="Password" autocomplete="current-password" required />
+            <div class="input-group-text">
+              <span class="bi bi-lock-fill"></span>
+            </div>
+          </div>
+          <!--begin::Row-->
+          <div class="row align-items-center mb-3">
+            <div class="col-7">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" value="" id="rememberMe" checked />
+                <label class="form-check-label text-secondary small" for="rememberMe"> Remember Me </label>
+              </div>
+            </div>
+            <!-- /.col -->
+            <div class="col-5">
+              <button type="submit" id="loginBtn" class="btn btn-primary w-100">
+                <span id="loginBtnText">Sign In</span>
+                <span id="loginSpinner" class="spinner-border spinner-border-sm d-none ms-1" role="status" aria-hidden="true"></span>
+              </button>
+            </div>
+            <!-- /.col -->
+          </div>
+          <!--end::Row-->
+        </form>
+      </div>
+      <!-- /.login-card-body -->
+    </div>
+  </main>
+  <!-- /.login-box -->
+
+  <!--begin::Third Party Plugin(OverlayScrollbars)-->
+  <script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
+    crossorigin="anonymous"></script>
+  <!--end::Third Party Plugin(OverlayScrollbars)--><!--begin::Required Plugin(popperjs for Bootstrap 5)-->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+    crossorigin="anonymous"></script>
+  <!--end::Required Plugin(popperjs for Bootstrap 5)--><!--begin::Required Plugin(Bootstrap 5)-->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+  <!--end::Required Plugin(Bootstrap 5)--><!--begin::Required Plugin(AdminLTE)-->
+  <script src="js/adminlte.js"></script>
+  <!--end::Required Plugin(AdminLTE)-->
+  <!--begin::App Settings Loader-->
+  <script>
+    // Fetch app settings from server and apply to title + login logo
+    (function () {
+      const CACHE_KEY = 'sentinel_app_settings';
+      const CACHE_TTL_MS = 60 * 1000;
+
+      function applySettings(settings) {
+        if (!settings) return;
+        const appName = settings.app_name || 'ALTCHA Manager';
+        document.title = 'Sign In | ' + appName;
+        const logoEl = document.getElementById('login-app-logo');
+        if (logoEl) logoEl.textContent = appName;
+      }
+
+      function loadFromCache() {
+        try {
+          const raw = sessionStorage.getItem(CACHE_KEY);
+          if (!raw) return null;
+          const { data, ts } = JSON.parse(raw);
+          if (Date.now() - ts > CACHE_TTL_MS) return null;
+          return data;
+        } catch { return null; }
+      }
+
+      const cached = loadFromCache();
+      if (cached) {
+        applySettings(cached);
+      } else {
+        fetch('/api/sentinel/app-settings')
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (data) {
+              try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() })); } catch { }
+              applySettings(data);
+            }
+          })
+          .catch(() => { /* keep static fallback title */ });
+      }
+    })();
+  </script>
+  <!--end::App Settings Loader-->
+  <!--begin::OverlayScrollbars Configure-->
+  <script>
+    const SELECTOR_SIDEBAR_WRAPPER = '.sidebar-wrapper';
+    const Default = {
+      scrollbarTheme: 'os-theme-light',
+      scrollbarAutoHide: 'leave',
+      scrollbarClickScroll: true,
+    };
+    document.addEventListener('DOMContentLoaded', function () {
+      const sidebarWrapper = document.querySelector(SELECTOR_SIDEBAR_WRAPPER);
+
+      // Disable OverlayScrollbars on mobile devices to prevent touch interference
+      const isMobile = window.innerWidth <= 992;
+
+      if (
+        sidebarWrapper &&
+        OverlayScrollbarsGlobal?.OverlayScrollbars !== undefined &&
+        !isMobile
+      ) {
+        OverlayScrollbarsGlobal.OverlayScrollbars(sidebarWrapper, {
+          scrollbars: {
+            theme: Default.scrollbarTheme,
+            autoHide: Default.scrollbarAutoHide,
+            clickScroll: Default.scrollbarClickScroll,
+          },
+        });
+      }
+    });
+  </script>
+  <!--end::OverlayScrollbars Configure-->
+  <!--begin::Charts follow the colour mode-->
+  <script>
+    // ApexCharts draws light-theme tooltips and axis text unless told otherwise,
+    // which is unreadable in dark mode (#6105). Give it the page's colour mode as
+    // a global default before any chart is created — this runs before the chart
+    // pages' own scripts — and keep every chart that has a `chart.id` in step
+    // when the mode changes (ColorMode, the OS in auto mode, or your own code).
+    (() => {
+      'use strict';
+      const mode = () =>
+        document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
+      // `Apex` is ApexCharts' global-options object; it must exist before the library loads.
+      // theme.mode also sets a dark chart background — keep the card's instead.
+      // eslint-disable-next-line unicorn/no-global-object-property-assignment
+      globalThis.Apex ||= {};
+      const apex = globalThis.Apex;
+      apex.theme = { mode: mode() };
+      apex.chart = Object.assign(apex.chart || {}, { background: 'transparent' });
+      new MutationObserver(() => {
+        const next = mode();
+        apex.theme = { mode: next };
+        const instances = apex._chartInstances || [];
+        for (const { chart } of instances) {
+          chart.updateOptions({ theme: { mode: next } }, false, false);
+        }
+      }).observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-bs-theme'],
+      });
+    })();
+  </script>
+  <!--end::Charts follow the colour mode-->
+
+  <!--begin::Login Logic-->
+  <script>
+    (function () {
+      'use strict';
+
+      // If already logged in, redirect straight to dashboard
+      fetch('/api/auth/me', { credentials: 'same-origin' })
+        .then(function (res) {
+          if (res.ok) {
+            window.location.replace('index.html');
+          }
+        })
+        .catch(function () {});
+
+      const form = document.getElementById('loginForm');
+      const usernameInput = document.getElementById('loginUsername');
+      const passwordInput = document.getElementById('loginPassword');
+      const alertBox = document.getElementById('loginAlert');
+      const alertText = document.getElementById('loginAlertText');
+      const submitBtn = document.getElementById('loginBtn');
+      const submitText = document.getElementById('loginBtnText');
+      const spinner = document.getElementById('loginSpinner');
+
+      function showError(msg) {
+        alertText.textContent = msg;
+        alertBox.classList.remove('d-none');
+      }
+
+      function hideError() {
+        alertBox.classList.add('d-none');
+        alertText.textContent = '';
+      }
+
+      function setLoading(loading) {
+        if (loading) {
+          submitBtn.disabled = true;
+          spinner.classList.remove('d-none');
+          submitText.textContent = 'Signing in';
+        } else {
+          submitBtn.disabled = false;
+          spinner.classList.add('d-none');
+          submitText.textContent = 'Sign In';
+        }
+      }
+
+      if (form) {
+        form.addEventListener('submit', async function (e) {
+          e.preventDefault();
+          hideError();
+
+          const username = usernameInput.value.trim();
+          const password = passwordInput.value;
+
+          if (!username || !password) {
+            showError('Please enter both username and password.');
+            return;
+          }
+
+          setLoading(true);
+
+          try {
+            const res = await fetch('/api/auth/login', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({ username, password }),
+            });
+
+            const data = await res.json().catch(function () { return {}; });
+
+            if (res.ok && data.success) {
+              if (data.role === 'user') {
+                window.location.replace('keys');
+              } else {
+                window.location.replace('index');
+              }
+            } else {
+              showError(data.error || 'Invalid username or password.');
+              passwordInput.value = '';
+              passwordInput.focus();
+              setLoading(false);
+            }
+          } catch (err) {
+            showError('Connection error. Please try again.');
+            setLoading(false);
+          }
+        });
+      }
+    })();
+  </script>
+  <!--end::Login Logic-->
+
+  <!--end::Script-->
+</body>
+<!--end::Body-->
+
+</html>

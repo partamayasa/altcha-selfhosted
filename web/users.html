@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--begin::Head-->
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>User Management | ALTCHA Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="title" content="User Management | ALTCHA Manager" />
+  <meta name="description" content="Manage system users and access roles." />
+
+  <!-- Fonts & Styles -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="./css/adminlte.css" />
+
+  <style>
+    /* Avoid bold font weights across layout and table headers */
+    body, h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6,
+    .card-title, .brand-text, .nav-link p, .badge,
+    b, strong, .fw-bold, .fw-semibold, .fw-bolder,
+    th, .table th, table th {
+      font-weight: 400 !important;
+    }
+
+    .app-footer, .app-footer * {
+      font-size: 0.78rem !important;
+      font-weight: 400 !important;
+    }
+  </style>
+</head>
+<!--end::Head-->
+
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="users">
+  <div class="app-wrapper">
+    <!-- Header (Loaded via Template) -->
+    <div data-template="header"></div>
+
+    <!-- Sidebar (Loaded via Template) -->
+    <div data-template="sidebar"></div>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <div class="app-content-header">
+        <div class="container-fluid">
+          <div class="row align-items-center">
+            <div class="col-sm-6">
+              <h1 class="mb-0 fs-3">
+                <i class="bi bi-people me-2 text-primary"></i> User Management
+              </h1>
+            </div>
+            <div class="col-sm-6 text-sm-end mt-2 mt-sm-0">
+              <button class="btn btn-primary btn-sm" id="btn-add-user" onclick="openCreateUserModal()">
+                <i class="bi bi-person-plus-fill me-1"></i> Add New User
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="app-content">
+        <div class="container-fluid">
+
+          <!-- Access Denied Banner for Non-Admin -->
+          <div id="access-denied-alert" class="alert alert-danger d-none shadow-sm" role="alert">
+            <h5 class="alert-heading"><i class="bi bi-shield-lock-fill me-2"></i> Access Restricted</h5>
+            <p class="mb-0">Only accounts with the Administrator role can view or manage users. Please contact your system administrator.</p>
+          </div>
+
+          <!-- Main Card -->
+          <div class="card card-outline card-primary shadow-sm" id="users-card">
+            <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
+              <h3 class="card-title fs-6 mb-0 d-flex align-items-center gap-2">
+                <i class="bi bi-people-fill text-primary"></i> Registered Users
+                <span class="badge text-bg-secondary fw-normal" id="users-count-badge">0 Users</span>
+              </h3>
+              <div class="card-tools">
+                <button type="button" class="btn btn-tool" onclick="loadUsers()" title="Refresh">
+                  <i class="bi bi-arrow-clockwise"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="card-body p-0 table-responsive">
+              <table class="table table-hover table-striped align-middle mb-0" id="users-table">
+                <thead class="table-light">
+                  <tr>
+                    <th style="width: 50px;" class="text-center">#</th>
+                    <th style="min-width: 150px;">Username</th>
+                    <th style="min-width: 180px;">Full Name</th>
+                    <th style="width: 140px;" class="text-center">Role</th>
+                    <th style="width: 150px;">Created At</th>
+                    <th style="width: 110px;" class="text-end pe-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="users-table-body">
+                  <tr>
+                    <td colspan="6" class="text-center py-4 text-secondary">
+                      <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                      Loading users
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (Loaded via Template) -->
+    <div data-template="footer"></div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+
+  <!-- Modal: Add / Edit User -->
+  <div class="modal fade" id="userFormModal" tabindex="-1" aria-labelledby="userFormModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content shadow">
+        <form id="userForm" onsubmit="handleUserFormSubmit(event)">
+          <div class="modal-header py-2 px-3">
+            <h5 class="modal-title fs-6" id="userFormModalLabel">Add New User</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-3">
+            <div id="userFormAlert" class="alert alert-danger d-none py-2 mb-3" style="font-size: 0.88rem;"></div>
+
+            <input type="hidden" id="editUserId" value="" />
+
+            <div class="mb-3">
+              <label for="formUsername" class="form-label small text-secondary mb-1">Username <span class="text-danger">*</span></label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-person"></i></span>
+                <input type="text" class="form-control" id="formUsername" placeholder="e.g. operator" required autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="formFullName" class="form-label small text-secondary mb-1">Full Name</label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-card-text"></i></span>
+                <input type="text" class="form-control" id="formFullName" placeholder="e.g. John Doe" autocomplete="off" />
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="formPassword" class="form-label small text-secondary mb-1">
+                Password <span id="passwordRequiredStar" class="text-danger">*</span>
+              </label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                <input type="password" class="form-control" id="formPassword" placeholder="Minimum 6 characters" autocomplete="new-password" />
+              </div>
+              <div class="form-text" id="passwordHelpText">Enter a secure password for this user.</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="formRole" class="form-label small text-secondary mb-1">Role <span class="text-danger">*</span></label>
+              <select class="form-select form-select-sm" id="formRole" required>
+                <option value="user">User (Standard API Client)</option>
+                <option value="administrator">Administrator (Full Access)</option>
+              </select>
+              <div class="form-text">Administrators can manage users and configure service settings.</div>
+            </div>
+          </div>
+          <div class="modal-footer py-2 px-3">
+            <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-sm btn-primary" id="btn-save-user">
+              <span id="btn-save-user-text">Save User</span>
+              <span id="btn-save-user-spinner" class="spinner-border spinner-border-sm d-none ms-1"></span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Delete Confirmation -->
+  <div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content shadow">
+        <div class="modal-header py-2 px-3 text-bg-danger">
+          <h5 class="modal-title fs-6"><i class="bi bi-exclamation-triangle-fill me-1"></i> Delete User</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-3 text-center">
+          <p class="mb-1">Are you sure you want to delete user:</p>
+          <span class="fs-6 text-danger" id="deleteUsernameDisplay">—</span>
+          <p class="small text-secondary mt-2 mb-0">This action cannot be undone and will delete the user account immediately.</p>
+        </div>
+        <div class="modal-footer py-2 px-3 justify-content-center">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-sm btn-danger" id="btn-confirm-delete" onclick="executeDeleteUser()">
+            Delete User
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+  <script src="./js/adminlte.js"></script>
+  <script src="./js/template-loader.js"></script>
+  <script src="./js/auth-guard.js"></script>
+  <script src="./js/app-settings.js"></script>
+
+  <script>
+    let userModalInstance = null;
+    let deleteModalInstance = null;
+    let usersData = [];
+    let targetUserId = null;
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const colors = { success: '#198754', error: '#dc3545', info: '#0dcaf0', warning: '#ffc107' };
+      const toast = document.createElement('div');
+      toast.style.cssText = `background:${colors[type] || colors.info};color:#fff;padding:.5rem 1rem;border-radius:6px;font-size:.84rem;box-shadow:0 2px 8px rgba(0,0,0,.2);max-width:320px;`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .25s'; setTimeout(() => toast.remove(), 300); }, 3500);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      userModalInstance = new bootstrap.Modal(document.getElementById('userFormModal'));
+      deleteModalInstance = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+
+      // Check current user role
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (res.ok) {
+          const me = await res.json();
+          if (me.role !== 'administrator') {
+            document.getElementById('access-denied-alert').classList.remove('d-none');
+            document.getElementById('users-card').classList.add('d-none');
+            document.getElementById('btn-add-user').classList.add('d-none');
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not verify role:', err.message);
+      }
+
+      loadUsers();
+    });
+
+    async function loadUsers() {
+      const tbody = document.getElementById('users-table-body');
+      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-secondary"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading users</td></tr>`;
+
+      try {
+        const res = await fetch('/api/sentinel/users', { credentials: 'same-origin' });
+        if (res.status === 403) {
+          document.getElementById('access-denied-alert').classList.remove('d-none');
+          document.getElementById('users-card').classList.add('d-none');
+          document.getElementById('btn-add-user').classList.add('d-none');
+          return;
+        }
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        usersData = data.users || [];
+        renderUsersTable(usersData);
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger"><i class="bi bi-exclamation-circle me-1"></i> Failed to load users: ${escapeHtml(err.message)}</td></tr>`;
+      }
+    }
+
+    function renderUsersTable(users) {
+      const tbody = document.getElementById('users-table-body');
+      const badge = document.getElementById('users-count-badge');
+      if (badge) badge.textContent = `${users.length} Users`;
+
+      if (users.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-secondary">No users found.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = users.map((u) => {
+        const roleBadge = u.role === 'administrator'
+          ? `<span class="badge text-bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">Administrator</span>`
+          : `<span class="badge text-bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">User</span>`;
+
+        const formattedDate = u.created_at ? u.created_at.split('T')[0] : '-';
+
+        return `
+          <tr>
+            <td class="text-center text-secondary small">${u.id}</td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-person-circle fs-5 ${u.role === 'administrator' ? 'text-primary' : 'text-secondary'}"></i>
+                <div>
+                  <span class="text-body">${escapeHtml(u.username)}</span>
+                  ${window.__authUser === u.username ? '<span class="badge bg-success-subtle text-success ms-1" style="font-size: 0.72rem;">You</span>' : ''}
+                </div>
+              </div>
+            </td>
+            <td>${escapeHtml(u.full_name || '-')}</td>
+            <td class="text-center">${roleBadge}</td>
+            <td class="small text-secondary">${formattedDate}</td>
+            <td class="text-end pe-3">
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-secondary btn-sm py-0 px-2" onclick="openEditUserModal(${u.id})" title="Edit User">
+                  <i class="bi bi-pencil-square"></i>
+                </button>
+                <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2" onclick="openDeleteUserModal(${u.id})" title="Delete User" ${window.__authUser === u.username ? 'disabled' : ''}>
+                  <i class="bi bi-trash"></i>
+                </button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openCreateUserModal() {
+      document.getElementById('userForm').reset();
+      document.getElementById('editUserId').value = '';
+      document.getElementById('userFormModalLabel').textContent = 'Add New User';
+      document.getElementById('formFullName').value = '';
+      document.getElementById('passwordRequiredStar').classList.remove('d-none');
+      document.getElementById('formPassword').required = true;
+      document.getElementById('passwordHelpText').textContent = 'Minimum 6 characters.';
+      document.getElementById('userFormAlert').classList.add('d-none');
+      userModalInstance.show();
+    }
+
+    function openEditUserModal(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+
+      document.getElementById('userForm').reset();
+      document.getElementById('editUserId').value = u.id;
+      document.getElementById('userFormModalLabel').textContent = `Edit User: ${u.username}`;
+      document.getElementById('formUsername').value = u.username;
+      document.getElementById('formFullName').value = u.full_name || '';
+      document.getElementById('formPassword').value = '';
+      document.getElementById('formPassword').required = false;
+      document.getElementById('passwordRequiredStar').classList.add('d-none');
+      document.getElementById('passwordHelpText').textContent = 'Leave empty to keep existing password.';
+      document.getElementById('formRole').value = u.role;
+      document.getElementById('userFormAlert').classList.add('d-none');
+      userModalInstance.show();
+    }
+
+    async function handleUserFormSubmit(e) {
+      e.preventDefault();
+      const alertEl = document.getElementById('userFormAlert');
+      alertEl.classList.add('d-none');
+
+      const id = document.getElementById('editUserId').value;
+      const username = document.getElementById('formUsername').value.trim();
+      const fullName = document.getElementById('formFullName').value.trim();
+      const password = document.getElementById('formPassword').value;
+      const role = document.getElementById('formRole').value;
+
+      if (!username) {
+        alertEl.textContent = 'Username is required.';
+        alertEl.classList.remove('d-none');
+        return;
+      }
+
+      if (!id && (!password || password.length < 6)) {
+        alertEl.textContent = 'Password must be at least 6 characters.';
+        alertEl.classList.remove('d-none');
+        return;
+      }
+
+      if (id && password && password.length < 6) {
+        alertEl.textContent = 'Password must be at least 6 characters.';
+        alertEl.classList.remove('d-none');
+        return;
+      }
+
+      const btn = document.getElementById('btn-save-user');
+      const btnText = document.getElementById('btn-save-user-text');
+      const spinner = document.getElementById('btn-save-user-spinner');
+
+      btn.disabled = true;
+      spinner.classList.remove('d-none');
+      btnText.textContent = 'Saving';
+
+      const isEdit = Boolean(id);
+      const url = isEdit ? `/api/sentinel/users/${id}` : '/api/sentinel/users';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const payload = { username, role, full_name: fullName };
+      if (password) payload.password = password;
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        userModalInstance.hide();
+        showToast(isEdit ? `User "${username}" updated successfully!` : `User "${username}" created successfully!`, 'success');
+        await loadUsers();
+      } catch (err) {
+        alertEl.textContent = err.message;
+        alertEl.classList.remove('d-none');
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+        btnText.textContent = isEdit ? 'Save Changes' : 'Save User';
+      }
+    }
+
+    function openDeleteUserModal(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+
+      targetUserId = id;
+      document.getElementById('deleteUsernameDisplay').textContent = u.username;
+      deleteModalInstance.show();
+    }
+
+    async function executeDeleteUser() {
+      if (!targetUserId) return;
+      const btn = document.getElementById('btn-confirm-delete');
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+
+      try {
+        const res = await fetch(`/api/sentinel/users/${targetUserId}`, {
+          method: 'DELETE',
+          credentials: 'same-origin'
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        deleteModalInstance.hide();
+        showToast('User deleted successfully.', 'success');
+        await loadUsers();
+      } catch (err) {
+        showToast('Failed to delete user: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Delete User';
+        targetUserId = null;
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+  </script>
+</body>
+
+</html>
