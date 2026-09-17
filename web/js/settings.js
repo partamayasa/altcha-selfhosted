@@ -6,20 +6,27 @@ const SentinelSettings = {
   config: null,
 
   async init() {
-    await this.loadConfig();
+    await Promise.all([
+      this.loadConfig(),
+      this.loadAppSettings(),
+    ]);
   },
+
+  // ────────────────────────────────────────────
+  // Engine / PoW Config
+  // ────────────────────────────────────────────
 
   async loadConfig() {
     try {
       const data = await SentinelAPI.getConfig();
       this.config = data;
-      this.render();
+      this.renderConfig();
     } catch (err) {
       SentinelApp.showToast('Failed to load engine configuration: ' + err.message, 'error');
     }
   },
 
-  render() {
+  renderConfig() {
     if (!this.config) return;
 
     const setVal = (id, val) => {
@@ -65,7 +72,60 @@ const SentinelSettings = {
     } catch (err) {
       SentinelApp.showToast('Failed to flush Redis cache: ' + err.message, 'error');
     }
+  },
+
+  // ────────────────────────────────────────────
+  // App Settings (Name, Tagline, Footer)
+  // ────────────────────────────────────────────
+
+  async loadAppSettings() {
+    try {
+      const settings = await SentinelAPI.getAppSettings();
+      this.renderAppSettings(settings);
+    } catch (err) {
+      SentinelApp.showToast('Failed to load app settings: ' + err.message, 'error');
+    }
+  },
+
+  renderAppSettings(settings) {
+    if (!settings) return;
+    const fields = ['app_name', 'app_tagline', 'app_footer'];
+    for (const key of fields) {
+      const el = document.getElementById(`app-setting-${key}`);
+      if (el && settings[key] !== undefined) {
+        el.value = settings[key];
+      }
+    }
+  },
+
+  async saveAppSettings() {
+    const fields = ['app_name', 'app_tagline', 'app_footer'];
+    const payload = {};
+    for (const key of fields) {
+      const el = document.getElementById(`app-setting-${key}`);
+      if (el) payload[key] = el.value.trim();
+    }
+
+    if (!payload.app_name) {
+      SentinelApp.showToast('App name cannot be empty.', 'error');
+      return;
+    }
+
+    try {
+      const res = await SentinelAPI.saveAppSettings(payload);
+      if (res.success) {
+        // Bust cached settings so all pages pick up the change on next load
+        if (typeof AppSettings !== 'undefined') {
+          AppSettings.bustCache();
+          AppSettings.apply(res.settings);
+        }
+        SentinelApp.showToast('App settings saved successfully!', 'success');
+      }
+    } catch (err) {
+      SentinelApp.showToast('Failed to save app settings: ' + err.message, 'error');
+    }
   }
 };
 
 window.SentinelSettings = SentinelSettings;
+

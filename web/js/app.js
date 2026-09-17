@@ -125,7 +125,7 @@ const SentinelApp = {
 
     // Update page title & breadcrumbs
     const titles = {
-      dashboard: { title: 'Overview & Stats', desc: 'ALTCHA Man v2.5', breadcrumb: 'Dashboard' },
+      dashboard: { title: 'Overview & Telemetry', desc: '', breadcrumb: 'Dashboard' },
       logs: { title: 'Audit Logs', desc: 'Traffic history & verification stream', breadcrumb: 'Logs' },
       whitelist: { title: 'Security Whitelist', desc: 'Domain origin protection rules', breadcrumb: 'Whitelist' },
       settings: { title: 'PoW Engine Policy', desc: 'Proof-of-Work engine parameters', breadcrumb: 'Policy' },

@@ -150,7 +150,7 @@ const SentinelWhitelist = {
     }
 
     resultBox.style.display = 'block';
-    resultBox.innerHTML = `<span class="text-muted" style="font-size:0.85rem;"><i class="fas fa-spinner fa-spin"></i> Testing ${origin}...</span>`;
+    resultBox.innerHTML = `<span class="text-muted" style="font-size:0.85rem;"><i class="fas fa-spinner fa-spin"></i> Testing ${origin}</span>`;
 
     try {
       const res = await SentinelAPI.testWhitelist(origin);

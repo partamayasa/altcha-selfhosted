@@ -83,14 +83,32 @@ const SentinelAPI = {
   },
 
   // Captcha Testing
-  async getChallenge() {
-    return this.request('/challenge');
+  async getChallenge(options = {}) {
+    return this.request('/challenge', options);
   },
 
-  async verify(payload) {
+  async verify(payload, options = {}) {
+    const { headers = {}, ...rest } = options;
     return this.request('/verify', {
       method: 'POST',
-      body: JSON.stringify({ payload }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      },
+      body: JSON.stringify({ payload, ...(options.body || {}) }),
+      ...rest
+    });
+  },
+
+  // App Settings
+  async getAppSettings() {
+    return this.request('/api/sentinel/app-settings');
+  },
+
+  async saveAppSettings(payload) {
+    return this.request('/api/sentinel/app-settings', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   }
 };
