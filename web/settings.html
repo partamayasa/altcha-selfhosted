@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--begin::Head-->
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>General Settings | ALTCHA Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="title" content="General Settings | ALTCHA Manager" />
+  <meta name="description" content="Configure application identity, public access URL, and service port." />
+
+  <!-- Fonts & Styles -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" />
+  <link rel="stylesheet" href="./css/adminlte.css" />
+
+  <style>
+    /* Clean, non-bold typography across the layout */
+    body, h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6,
+    .card-title, .brand-text, .nav-link p, .badge,
+    b, strong, .fw-bold, .fw-semibold, .fw-bolder,
+    th, .table th, table th {
+      font-weight: 400 !important;
+    }
+
+    .code-box {
+      background-color: var(--bs-tertiary-bg);
+      border: 1px solid var(--bs-border-color);
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-size: 0.84rem;
+      overflow-x: auto;
+    }
+
+    .code-box pre {
+      margin: 0;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .app-footer, .app-footer * {
+      font-size: 0.78rem !important;
+      font-weight: 400 !important;
+    }
+  </style>
+</head>
+<!--end::Head-->
+
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="settings">
+  <div class="app-wrapper">
+    <!-- Header (Loaded via Template) -->
+    <div data-template="header"></div>
+
+    <!-- Sidebar (Loaded via Template) -->
+    <div data-template="sidebar"></div>
+
+    <!-- Main Content -->
+    <main class="app-main">
+      <div class="app-content-header">
+        <div class="container-fluid">
+          <div class="row align-items-center">
+            <div class="col-sm-6">
+              <h1 class="mb-0 fs-3">
+                <i class="bi bi-gear me-2 text-primary"></i>
+                General Settings
+              </h1>
+            </div>
+            <div class="col-sm-6">
+              <ol class="breadcrumb float-sm-end mb-0 fs-7">
+                <li class="breadcrumb-item"><a href="./index.html" class="text-decoration-none">Home</a></li>
+                <li class="breadcrumb-item">System Configuration</li>
+                <li class="breadcrumb-item active" aria-current="page">General Settings</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="app-content">
+        <div class="container-fluid">
+
+          <!-- Access Denied Banner for Non-Admin -->
+          <div id="access-denied-alert" class="alert alert-danger d-none shadow-sm" role="alert">
+            <h5 class="alert-heading"><i class="bi bi-shield-lock-fill me-2"></i> Access Restricted</h5>
+            <p class="mb-0">Only accounts with the Administrator role can modify service settings.</p>
+          </div>
+
+          <div class="row g-3" id="settings-content-area">
+            
+            <!-- Left Column: Settings Form -->
+            <div class="col-lg-7">
+              <div class="card card-outline card-primary shadow-sm mb-4">
+                <div class="card-header py-2 px-3">
+                  <h3 class="card-title fs-6 mb-0">
+                    <i class="bi bi-sliders text-primary me-1"></i> Application &amp; Server Identity
+                  </h3>
+                </div>
+                <div class="card-body p-4">
+                  <form id="generalSettingsForm" onsubmit="handleSaveSettings(event)">
+                    
+                    <!-- 1. App Name -->
+                    <div class="mb-3">
+                      <label for="setting-app-name" class="form-label small text-secondary mb-1">
+                        Application Name <span class="text-danger">*</span>
+                      </label>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-app-indicator"></i></span>
+                        <input type="text" class="form-control" id="setting-app-name" placeholder="e.g. ALTCHA Manager" required />
+                      </div>
+                      <div class="form-text">Displayed in brand titles, header navigation, and page titles.</div>
+                    </div>
+
+                    <!-- 2. App Public URL -->
+                    <div class="mb-3">
+                      <label for="setting-app-url" class="form-label small text-secondary mb-1">
+                        Application Public Base URL <span class="text-danger">*</span>
+                      </label>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-globe"></i></span>
+                        <input type="url" class="form-control font-monospace" id="setting-app-url" placeholder="e.g. https://captcha.yourdomain.com" required oninput="updateLivePreviews()" />
+                      </div>
+                      <div class="form-text">Used across integration tutorials, code snippets, and widget embed URLs in production.</div>
+                    </div>
+
+                    <!-- 3. App Port -->
+                    <div class="mb-3">
+                      <label for="setting-app-port" class="form-label small text-secondary mb-1">
+                        Application Service Port <span class="text-danger">*</span>
+                      </label>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-ethernet"></i></span>
+                        <input type="number" class="form-control font-monospace" id="setting-app-port" placeholder="8000" min="1" max="65535" required />
+                      </div>
+                      <div class="form-text">The TCP port the self-hosted engine listens on. Port changes take effect when the server restarts.</div>
+                    </div>
+
+                    <!-- 4. App Tagline -->
+                    <div class="mb-4">
+                      <label for="setting-app-tagline" class="form-label small text-secondary mb-1">
+                        Application Tagline
+                      </label>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-card-text"></i></span>
+                        <input type="text" class="form-control" id="setting-app-tagline" placeholder="e.g. Self-Hosted CAPTCHA Service" />
+                      </div>
+                      <div class="form-text">Subtitle displayed on the login page and branding headers.</div>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                      <button type="button" class="btn btn-sm btn-outline-secondary" onclick="loadSettingsForm()">
+                        Reset
+                      </button>
+                      <button type="submit" class="btn btn-sm btn-primary" id="btn-save-settings">
+                        <span id="btn-save-text">Save Settings</span>
+                        <span id="btn-save-spinner" class="spinner-border spinner-border-sm d-none ms-1"></span>
+                      </button>
+                    </div>
+
+                  </form>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Column: Live Integration Preview -->
+            <div class="col-lg-5">
+              <div class="card card-outline card-info shadow-sm mb-4">
+                <div class="card-header py-2 px-3">
+                  <h3 class="card-title fs-6 mb-0">
+                    <i class="bi bi-eye text-info me-1"></i> Live Integration Preview
+                  </h3>
+                </div>
+                <div class="card-body p-3">
+                  <p class="text-secondary small mb-3">
+                    Tutorials in Key Manager and Playground will dynamically generate using your configured Public URL:
+                  </p>
+
+                  <div class="mb-3">
+                    <label class="form-label text-secondary small mb-1">Frontend Widget Embed Snippet:</label>
+                    <div class="code-box">
+                      <pre id="preview-widget-snippet">&lt;altcha-widget challengeurl="https://captcha.yourdomain.com/challenge?apiKey=YOUR_API_KEY"&gt;&lt;/altcha-widget&gt;</pre>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="form-label text-secondary small mb-1">Backend Server Verification Endpoint:</label>
+                    <div class="code-box">
+                      <pre id="preview-verify-snippet">POST https://captcha.yourdomain.com/verify
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+
+{"payload": "&lt;payload_from_widget&gt;"}</pre>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer (Loaded via Template) -->
+    <div data-template="footer"></div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+  <script src="./js/adminlte.js"></script>
+  <script src="./js/template-loader.js"></script>
+  <script src="./js/auth-guard.js"></script>
+  <script src="./js/app-settings.js"></script>
+
+  <script>
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const colors = { success: '#198754', error: '#dc3545', info: '#0dcaf0', warning: '#ffc107' };
+      const toast = document.createElement('div');
+      toast.style.cssText = `background:${colors[type] || colors.info};color:#fff;padding:.5rem 1rem;border-radius:6px;font-size:.84rem;box-shadow:0 2px 8px rgba(0,0,0,.2);max-width:320px;`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .25s'; setTimeout(() => toast.remove(), 300); }, 3500);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      // Role check
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+        if (res.ok) {
+          const me = await res.json();
+          if (me.role !== 'administrator') {
+            document.getElementById('access-denied-alert').classList.remove('d-none');
+            document.getElementById('settings-content-area').classList.add('d-none');
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Role verification error:', err.message);
+      }
+
+      await loadSettingsForm();
+    });
+
+    async function loadSettingsForm() {
+      try {
+        const res = await fetch('/api/sentinel/app-settings');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        document.getElementById('setting-app-name').value = data.app_name || 'ALTCHA Manager';
+        document.getElementById('setting-app-url').value = data.app_url || window.location.origin;
+        document.getElementById('setting-app-port').value = data.app_port || '8000';
+        document.getElementById('setting-app-tagline').value = data.app_tagline || 'Self-Hosted CAPTCHA Service';
+
+        updateLivePreviews();
+      } catch (err) {
+        showToast('Failed to load settings: ' + err.message, 'error');
+      }
+    }
+
+    function updateLivePreviews() {
+      const rawUrl = document.getElementById('setting-app-url').value.trim();
+      const cleanUrl = rawUrl ? rawUrl.replace(/\/+$/, '') : window.location.origin;
+
+      document.getElementById('preview-widget-snippet').textContent =
+        `<altcha-widget challengeurl="${cleanUrl}/challenge?apiKey=YOUR_API_KEY"></altcha-widget>`;
+
+      document.getElementById('preview-verify-snippet').textContent =
+        `POST ${cleanUrl}/verify
+Authorization: Bearer YOUR_API_KEY
+Content-Type: application/json
+
+{"payload": "<payload_from_widget>"}`;
+    }
+
+    async function handleSaveSettings(e) {
+      e.preventDefault();
+
+      const btn = document.getElementById('btn-save-settings');
+      const btnText = document.getElementById('btn-save-text');
+      const spinner = document.getElementById('btn-save-spinner');
+
+      btn.disabled = true;
+      spinner.classList.remove('d-none');
+      btnText.textContent = 'Saving';
+
+      const app_name = document.getElementById('setting-app-name').value.trim();
+      const app_url = document.getElementById('setting-app-url').value.trim();
+      const app_port = document.getElementById('setting-app-port').value.trim();
+      const app_tagline = document.getElementById('setting-app-tagline').value.trim();
+
+      const payload = {
+        app_name,
+        app_url,
+        app_port,
+        app_tagline
+      };
+
+      try {
+        const res = await fetch('/api/sentinel/app-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+
+        // Bust cache and re-apply settings
+        if (window.AppSettings) {
+          window.AppSettings.bustCache();
+          window.AppSettings.apply(data.settings);
+        }
+
+        showToast('Settings updated successfully!', 'success');
+        updateLivePreviews();
+      } catch (err) {
+        showToast('Failed to save settings: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('d-none');
+        btnText.textContent = 'Save Settings';
+      }
+    }
+  </script>
+</body>
+
+</html>

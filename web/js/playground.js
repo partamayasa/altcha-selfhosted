@@ -4,19 +4,39 @@
 
 const SentinelPlayground = {
   currentChallenge: null,
+  userApiKey: null,
+  currentUsername: null,
 
-  init() {
+  async init() {
+    await this.loadUserProfile();
     this.updateSnippets();
     this.setupWidgetListener();
+  },
+
+  async loadUserProfile() {
+    try {
+      const res = await fetch('/api/auth/me');
+      if (res.ok) {
+        const data = await res.json();
+        this.userApiKey = data.apiKey || null;
+        this.currentUsername = data.username || null;
+      }
+    } catch (err) {
+      console.warn('Could not load user profile for playground:', err.message);
+    }
   },
 
   setupWidgetListener() {
     const widget = document.getElementById('sentinel-demo-widget');
     if (!widget) return;
 
-    // Dynamically set challenge URL to the current server
+    // Dynamically set challenge URL to the current server with API key query parameter
     const currentOrigin = window.location.origin;
-    widget.setAttribute('challengeurl', `${currentOrigin}/challenge`);
+    const challengeUrl = this.userApiKey
+      ? `${currentOrigin}/challenge?apiKey=${encodeURIComponent(this.userApiKey)}`
+      : `${currentOrigin}/challenge`;
+
+    widget.setAttribute('challengeurl', challengeUrl);
 
     widget.addEventListener('statechange', (ev) => {
       const state = ev.detail?.state;
@@ -39,10 +59,15 @@ const SentinelPlayground = {
     const outputEl = document.getElementById('manual-challenge-output');
     if (!outputEl) return;
 
-    outputEl.textContent = 'Requesting challenge from server...';
+    outputEl.textContent = 'Requesting challenge from server';
 
     try {
-      const data = await SentinelAPI.getChallenge();
+      const reqHeaders = {};
+      let endpoint = '/challenge';
+      if (this.userApiKey) {
+        reqHeaders['Authorization'] = `Bearer ${this.userApiKey}`;
+      }
+      const data = await SentinelAPI.getChallenge({ headers: reqHeaders });
       this.currentChallenge = data;
       outputEl.textContent = JSON.stringify(data, null, 2);
       SentinelApp.showToast('Challenge successfully retrieved!', 'success');
@@ -63,10 +88,14 @@ const SentinelPlayground = {
       return;
     }
 
-    outputEl.textContent = 'Verifying payload with /verify...';
+    outputEl.textContent = 'Verifying payload with /verify';
 
     try {
-      const data = await SentinelAPI.verify(payload);
+      const reqHeaders = {};
+      if (this.userApiKey) {
+        reqHeaders['Authorization'] = `Bearer ${this.userApiKey}`;
+      }
+      const data = await SentinelAPI.verify(payload, { headers: reqHeaders });
       outputEl.textContent = JSON.stringify(data, null, 2);
       if (data.success || data.verification?.verified) {
         SentinelApp.showToast('Payload VALID! Successfully verified.', 'success');
@@ -80,16 +109,17 @@ const SentinelPlayground = {
   },
 
   updateSnippets() {
-    const origin = window.location.origin;
+    const origin = window.AppSettings ? window.AppSettings.getBaseUrl() : window.location.origin;
+    const apiKeyDisplay = this.userApiKey || 'YOUR_API_KEY';
 
     const htmlSnippet = `<!-- 1. Load ALTCHA Widget script -->
 <script async defer src="${origin}/altcha.min.js" type="module"></script>
 
-<!-- 2. Embed widget inside your HTML form -->
+<!-- 2. Embed widget inside your HTML form with your API key -->
 <form action="/api/submit-form" method="POST">
   <input type="text" name="name" placeholder="Your Name" required />
   
-  <altcha-widget challengeurl="${origin}/challenge"></altcha-widget>
+  <altcha-widget challengeurl="${origin}/challenge?apiKey=${apiKeyDisplay}"></altcha-widget>
   
   <button type="submit">Submit Form</button>
 </form>`;
@@ -100,12 +130,17 @@ import express from 'express';
 const app = express();
 app.use(express.json());
 
+const ALTCHA_API_KEY = '${apiKeyDisplay}';
+
 app.post('/api/submit-form', async (req, res) => {
   const altchaPayload = req.body.altcha; // Automatically populated by widget
 
   const verifyResponse = await fetch('${origin}/verify', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + ALTCHA_API_KEY
+    },
     body: JSON.stringify({ payload: altchaPayload })
   });
 
@@ -114,19 +149,23 @@ app.post('/api/submit-form', async (req, res) => {
     return res.status(400).json({ error: 'Captcha verification failed.' });
   }
 
-  // Continue processing form...
+  // Continue processing form
   res.json({ status: 'Form submitted successfully!' });
 });`;
 
     const phpSnippet = `<?php
 // ALTCHA Verification in PHP
 $payload = $_POST['altcha'] ?? '';
+$apiKey  = '${apiKeyDisplay}';
 
 $ch = curl_init('${origin}/verify');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['payload' => $payload]));
-curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Content-Type: application/json',
+    'Authorization: Bearer ' . $apiKey
+]);
 
 $response = curl_exec($ch);
 curl_close($ch);
@@ -137,16 +176,17 @@ if (empty($result['success']) && empty($result['verification']['verified'])) {
     die('Spam verification failed.');
 }
 
-// Continue processing form...
+// Continue processing form
 echo "Successfully verified!";
 ?>`;
 
-    const curlSnippet = `# 1. Request PoW Challenge
-curl -X GET "${origin}/challenge"
+    const curlSnippet = `# 1. Request PoW Challenge (via Query Parameter or Authorization Header)
+curl -X GET "${origin}/challenge?apiKey=${apiKeyDisplay}"
 
-# 2. Verify solved payload
+# 2. Verify solved payload with Authorization Header
 curl -X POST "${origin}/verify" \\
   -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer ${apiKeyDisplay}" \\
   -d '{"payload": "BASE64_PAYLOAD_HERE"}'`;
 
     const setCode = (id, code) => {
@@ -173,3 +213,9 @@ curl -X POST "${origin}/verify" \\
 };
 
 window.SentinelPlayground = SentinelPlayground;
+
+document.addEventListener('app-settings:loaded', () => {
+  if (window.SentinelPlayground && typeof SentinelPlayground.updateSnippets === 'function') {
+    SentinelPlayground.updateSnippets();
+  }
+});
