@@ -87,16 +87,17 @@
                 <thead class="table-light">
                   <tr>
                     <th style="width: 50px;" class="text-center">#</th>
-                    <th style="min-width: 150px;">Username</th>
-                    <th style="min-width: 180px;">Full Name</th>
-                    <th style="width: 140px;" class="text-center">Role</th>
-                    <th style="width: 150px;">Created At</th>
-                    <th style="width: 110px;" class="text-end pe-3">Actions</th>
+                    <th style="min-width: 140px;">Username</th>
+                    <th style="min-width: 160px;">Full Name</th>
+                    <th style="width: 130px;" class="text-center">Role</th>
+                    <th style="min-width: 200px;">Domain Whitelist</th>
+                    <th style="width: 130px;">Created At</th>
+                    <th style="width: 130px;" class="text-end pe-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="users-table-body">
                   <tr>
-                    <td colspan="6" class="text-center py-4 text-secondary">
+                    <td colspan="7" class="text-center py-4 text-secondary">
                       <div class="spinner-border spinner-border-sm me-2" role="status"></div>
                       Loading users
                     </td>
@@ -154,8 +155,25 @@
               <div class="input-group input-group-sm">
                 <span class="input-group-text"><i class="bi bi-lock"></i></span>
                 <input type="password" class="form-control" id="formPassword" placeholder="Minimum 6 characters" autocomplete="new-password" />
+                <button class="btn btn-outline-secondary" type="button" onclick="toggleFieldPasswordVisibility('formPassword')" title="Show/Hide">
+                  <i class="bi bi-eye"></i>
+                </button>
               </div>
               <div class="form-text" id="passwordHelpText">Enter a secure password for this user.</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="formRePassword" class="form-label small text-secondary mb-1">
+                Repassword <span id="rePasswordRequiredStar" class="text-danger">*</span>
+              </label>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"><i class="bi bi-shield-check"></i></span>
+                <input type="password" class="form-control" id="formRePassword" placeholder="Repeat password" autocomplete="new-password" />
+                <button class="btn btn-outline-secondary" type="button" onclick="toggleFieldPasswordVisibility('formRePassword')" title="Show/Hide">
+                  <i class="bi bi-eye"></i>
+                </button>
+              </div>
+              <div class="form-text" id="rePasswordHelpText">Repeat password to confirm.</div>
             </div>
 
             <div class="mb-3">
@@ -252,7 +270,7 @@
 
     async function loadUsers() {
       const tbody = document.getElementById('users-table-body');
-      tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-secondary"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading users</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-secondary"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading users</td></tr>`;
 
       try {
         const res = await fetch('/api/sentinel/users', { credentials: 'same-origin' });
@@ -271,8 +289,46 @@
         usersData = data.users || [];
         renderUsersTable(usersData);
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-danger"><i class="bi bi-exclamation-circle me-1"></i> Failed to load users: ${escapeHtml(err.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-danger"><i class="bi bi-exclamation-circle me-1"></i> Failed to load users: ${escapeHtml(err.message)}</td></tr>`;
       }
+    }
+
+    function renderDomainBadges(originsJson) {
+      let origins = [];
+      try {
+        if (typeof originsJson === 'string') {
+          origins = JSON.parse(originsJson);
+        } else if (Array.isArray(originsJson)) {
+          origins = originsJson;
+        }
+      } catch {
+        origins = [];
+      }
+
+      if (!origins || origins.length === 0) {
+        return `<span class="badge text-bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;">
+          <i class="bi bi-shield-slash me-1"></i>None (Block All)
+        </span>`;
+      }
+
+      if (origins.includes('*')) {
+        return `<span class="badge text-bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;">
+          <i class="bi bi-globe me-1"></i>Wildcard (*)
+        </span>`;
+      }
+
+      const MAX = 2;
+      const shown = origins.slice(0, MAX);
+      const extra = origins.length - MAX;
+      let html = shown.map(o =>
+        `<span class="badge text-bg-info-subtle text-info border border-info-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;font-family:monospace;">${escapeHtml(o)}</span>`
+      ).join(' ');
+
+      if (extra > 0) {
+        html += ` <span class="badge text-bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1" style="font-size:0.72rem;font-weight:400;" title="${escapeHtml(origins.join('\n'))}">+${extra} more</span>`;
+      }
+
+      return `<div class="d-flex flex-wrap gap-1 align-items-center">${html}</div>`;
     }
 
     function renderUsersTable(users) {
@@ -281,20 +337,21 @@
       if (badge) badge.textContent = `${users.length} Users`;
 
       if (users.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-4 text-secondary">No users found.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-center py-4 text-secondary">No users found.</td></tr>`;
         return;
       }
 
-      tbody.innerHTML = users.map((u) => {
+      tbody.innerHTML = users.map((u, idx) => {
         const roleBadge = u.role === 'administrator'
           ? `<span class="badge text-bg-primary-subtle text-primary border border-primary-subtle px-2 py-1">Administrator</span>`
           : `<span class="badge text-bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">User</span>`;
 
         const formattedDate = u.created_at ? u.created_at.split('T')[0] : '-';
+        const domainDisplay = renderDomainBadges(u.allowed_origins);
 
         return `
           <tr>
-            <td class="text-center text-secondary small">${u.id}</td>
+            <td class="text-center text-secondary small">${idx + 1}</td>
             <td>
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-person-circle fs-5 ${u.role === 'administrator' ? 'text-primary' : 'text-secondary'}"></i>
@@ -306,6 +363,7 @@
             </td>
             <td>${escapeHtml(u.full_name || '-')}</td>
             <td class="text-center">${roleBadge}</td>
+            <td>${domainDisplay}</td>
             <td class="small text-secondary">${formattedDate}</td>
             <td class="text-end pe-3">
               <div class="btn-group btn-group-sm">
@@ -322,14 +380,33 @@
       }).join('');
     }
 
+    function toggleFieldPasswordVisibility(inputId) {
+      const el = document.getElementById(inputId);
+      if (!el) return;
+      el.type = el.type === 'password' ? 'text' : 'password';
+      const icon = el.parentElement.querySelector('i');
+      if (icon) {
+        if (el.type === 'text') {
+          icon.classList.remove('bi-eye');
+          icon.classList.add('bi-eye-slash');
+        } else {
+          icon.classList.remove('bi-eye-slash');
+          icon.classList.add('bi-eye');
+        }
+      }
+    }
+
     function openCreateUserModal() {
       document.getElementById('userForm').reset();
       document.getElementById('editUserId').value = '';
       document.getElementById('userFormModalLabel').textContent = 'Add New User';
       document.getElementById('formFullName').value = '';
       document.getElementById('passwordRequiredStar').classList.remove('d-none');
+      document.getElementById('rePasswordRequiredStar').classList.remove('d-none');
       document.getElementById('formPassword').required = true;
+      document.getElementById('formRePassword').required = true;
       document.getElementById('passwordHelpText').textContent = 'Minimum 6 characters.';
+      document.getElementById('rePasswordHelpText').textContent = 'Repeat password to confirm.';
       document.getElementById('userFormAlert').classList.add('d-none');
       userModalInstance.show();
     }
@@ -344,9 +421,13 @@
       document.getElementById('formUsername').value = u.username;
       document.getElementById('formFullName').value = u.full_name || '';
       document.getElementById('formPassword').value = '';
+      document.getElementById('formRePassword').value = '';
       document.getElementById('formPassword').required = false;
+      document.getElementById('formRePassword').required = false;
       document.getElementById('passwordRequiredStar').classList.add('d-none');
+      document.getElementById('rePasswordRequiredStar').classList.add('d-none');
       document.getElementById('passwordHelpText').textContent = 'Leave empty to keep existing password.';
+      document.getElementById('rePasswordHelpText').textContent = 'Leave empty to keep existing password.';
       document.getElementById('formRole').value = u.role;
       document.getElementById('userFormAlert').classList.add('d-none');
       userModalInstance.show();
@@ -361,6 +442,7 @@
       const username = document.getElementById('formUsername').value.trim();
       const fullName = document.getElementById('formFullName').value.trim();
       const password = document.getElementById('formPassword').value;
+      const rePassword = document.getElementById('formRePassword').value;
       const role = document.getElementById('formRole').value;
 
       if (!username) {
@@ -375,8 +457,20 @@
         return;
       }
 
+      if (!id && password !== rePassword) {
+        alertEl.textContent = 'Password and Repassword do not match.';
+        alertEl.classList.remove('d-none');
+        return;
+      }
+
       if (id && password && password.length < 6) {
         alertEl.textContent = 'Password must be at least 6 characters.';
+        alertEl.classList.remove('d-none');
+        return;
+      }
+
+      if (id && password && password !== rePassword) {
+        alertEl.textContent = 'Password and Repassword do not match.';
         alertEl.classList.remove('d-none');
         return;
       }
