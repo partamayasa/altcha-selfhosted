@@ -1,0 +1,109 @@
+<!--begin::Sidebar-->
+<aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
+  <!--begin::Sidebar Brand-->
+  <div class="sidebar-brand">
+    <!--begin::Brand Link-->
+    <a href="./index" class="brand-link d-flex align-items-center justify-content-start px-3" title="ALTCHA Manager (ALTCHA Man)">
+      <!--begin::Brand Image-->
+      <img src="./assets/logo.png" alt="ALTCHA Manager Logo" class="brand-image" style="width: 24px; height: 24px; max-height: 24px; object-fit: contain; margin-right: 10px;" />
+      <!--end::Brand Image-->
+      <!--begin::Brand Text-->
+      <span class="brand-text fw-light" style="font-size: 1.15rem; letter-spacing: 0.3px;">ALTCHA <span style="color: #0dcaf0; font-weight: normal;">Manager</span></span>
+      <!--end::Brand Text-->
+    </a>
+    <!--end::Brand Link-->
+  </div>
+  <!--end::Sidebar Brand-->
+
+  <!--begin::Sidebar Wrapper-->
+  <div class="sidebar-wrapper">
+    <nav class="mt-2" aria-label="Main navigation">
+      <!--begin::Sidebar Menu-->
+      <ul class="nav sidebar-menu flex-column" data-lte-toggle="treeview" data-accordion="false" id="navigation">
+        
+        <!--begin::Group MONITORING (Admin Only)-->
+        <li class="nav-header" data-role="admin-only">MONITORING</li>
+
+        <li class="nav-item" data-role="admin-only">
+          <a href="./index" class="nav-link" data-menu-key="dashboard" data-tab="dashboard">
+            <i class="nav-icon bi bi-speedometer2"></i>
+            <p>Overview &amp; Telemetry</p>
+          </a>
+        </li>
+
+        <li class="nav-item" data-role="admin-only">
+          <a href="./logs" class="nav-link" data-menu-key="logs" data-tab="logs">
+            <i class="nav-icon bi bi-file-earmark-text"></i>
+            <p>
+              Audit Logs
+              <span class="nav-badge badge text-bg-info me-3" id="sidebar-log-pill">Live</span>
+            </p>
+          </a>
+        </li>
+        <!--end::Group MONITORING-->
+
+        <!--begin::Group ACCESS CONTROL-->
+        <li class="nav-header" data-role="all">ACCESS CONTROL</li>
+
+        <li class="nav-item" data-role="all">
+          <a href="./keys" class="nav-link" data-menu-key="keys" data-tab="keys">
+            <i class="nav-icon bi bi-key"></i>
+            <p>Key Manager</p>
+          </a>
+        </li>
+
+        <li class="nav-item" data-role="admin-only">
+          <a href="./users" class="nav-link" data-menu-key="users" data-tab="users">
+            <i class="nav-icon bi bi-people"></i>
+            <p>User Management</p>
+          </a>
+        </li>
+        <!--end::Group ACCESS CONTROL-->
+
+        <!--begin::Group SYSTEM CONFIGURATION (Admin Only)-->
+        <li class="nav-header" data-role="admin-only">SYSTEM CONFIGURATION</li>
+
+        <li class="nav-item" data-role="admin-only">
+          <a href="./pow-policy" class="nav-link" data-menu-key="pow" data-tab="pow">
+            <i class="nav-icon bi bi-cpu"></i>
+            <p>PoW Engine Policy</p>
+          </a>
+        </li>
+
+        <li class="nav-item" data-role="admin-only">
+          <a href="./settings" class="nav-link" data-menu-key="settings" data-tab="settings">
+            <i class="nav-icon bi bi-gear"></i>
+            <p>General Settings</p>
+          </a>
+        </li>
+        <!--end::Group SYSTEM CONFIGURATION-->
+
+        <!--begin::Group DEVELOPER (Admin Only)-->
+        <li class="nav-header" data-role="admin-only">DEVELOPER</li>
+
+        <li class="nav-item" data-role="admin-only">
+          <a href="./playground" class="nav-link" data-menu-key="playground" data-tab="playground">
+            <i class="nav-icon bi bi-play-circle"></i>
+            <p>Playground &amp; Snippets</p>
+          </a>
+        </li>
+        <!--end::Group DEVELOPER-->
+
+        <!--begin::Group ACCOUNT (All Users)-->
+        <li class="nav-header" data-role="all">ACCOUNT</li>
+
+        <li class="nav-item" data-role="all">
+          <a href="#" class="nav-link text-danger" onclick="event.preventDefault(); window.AuthGuard && window.AuthGuard.logout();">
+            <i class="nav-icon bi bi-box-arrow-right text-danger"></i>
+            <p>Sign Out</p>
+          </a>
+        </li>
+        <!--end::Group ACCOUNT-->
+
+      </ul>
+      <!--end::Sidebar Menu-->
+    </nav>
+  </div>
+  <!--end::Sidebar Wrapper-->
+</aside>
+<!--end::Sidebar-->
