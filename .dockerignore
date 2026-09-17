@@ -1,0 +1,14 @@
+node_modules
+npm-debug.log*
+.git
+.gitignore
+.admin-lte-v4.9.1
+tools
+database/*.db
+database/*.db-journal
+database/*.db-wal
+database/*.db-shm
+log/*.log
+.env
+.env.local
+README.md

@@ -2,8 +2,14 @@
   "name": "altcha-selfhosted",
   "version": "2.5.0",
   "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
   "dependencies": {
     "altcha-lib": "^2.5.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",

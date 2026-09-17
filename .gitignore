@@ -3,4 +3,6 @@ node_modules/
 whitelist.json
 log/*
 !log/.gitkeep
+database/*
 *.log
+.admin-lte-v4.9.1
