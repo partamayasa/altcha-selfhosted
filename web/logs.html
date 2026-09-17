@@ -147,7 +147,7 @@
 <!--end::Head-->
 
 <!--begin::Body-->
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="logs">
+<body class="hold-transition layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="logs">
   <!--begin::App Wrapper-->
   <div class="app-wrapper">
     <!--begin::Header (Loaded via Template)-->
@@ -156,6 +156,18 @@
 
     <!--begin::Sidebar (Loaded via Template)-->
     <div data-template="sidebar"></div>
+    <script>
+      (function(){
+        try {
+          var s = sessionStorage.getItem('sentinel_tpl_./templates/sidebar.html');
+          var el = document.querySelector('[data-template="sidebar"]');
+          if (s && el) { var t = document.createElement('template'); t.innerHTML = s.trim(); el.replaceWith(t.content); }
+          var h = sessionStorage.getItem('sentinel_tpl_./templates/header.html');
+          var hel = document.querySelector('[data-template="header"]');
+          if (h && hel) { var th = document.createElement('template'); th.innerHTML = h.trim(); hel.replaceWith(th.content); }
+        } catch(e){}
+      })();
+    </script>
     <!--end::Sidebar-->
 
     <!--begin::App Main-->
@@ -240,7 +252,7 @@
                   </select>
                 </div>
 
-                <div class="col-md-6 text-sm-end">
+                <div class="col-md-6 text-sm-end d-flex justify-content-sm-end gap-2 flex-wrap">
                   <div class="btn-group btn-group-sm" role="group" aria-label="Export Actions">
                     <button id="export-csv" type="button" class="btn btn-outline-secondary">
                       <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>
@@ -255,6 +267,10 @@
                       Print
                     </button>
                   </div>
+                  <button id="open-delete-logs-btn" type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteLogsModal">
+                    <i class="bi bi-trash3 me-1" aria-hidden="true"></i>
+                    Hapus Log
+                  </button>
                 </div>
               </div>
 
@@ -309,6 +325,75 @@
     </div>
   </div>
 
+  <!-- Delete Logs Modal -->
+  <div class="modal fade" id="deleteLogsModal" tabindex="-1" aria-labelledby="deleteLogsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content shadow border-danger-subtle">
+        <div class="modal-header py-2 px-3 bg-danger-subtle text-danger-emphasis">
+          <h5 class="modal-title fs-6 fw-bold" id="deleteLogsModalLabel">
+            <i class="bi bi-trash3 me-2"></i>
+            Hapus Data Audit &amp; Traffic Logs
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-3">
+          <div class="alert alert-danger d-flex align-items-center py-2 px-3 mb-3 small" role="alert">
+            <i class="bi bi-exclamation-triangle-fill flex-shrink-0 me-2 fs-5"></i>
+            <div>Data log yang dihapus akan dibersihkan dari database secara <strong>permanen</strong> dan tidak dapat dipulihkan.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="delete-range-select" class="form-label fw-semibold small text-secondary">
+              Pilih Rentang / Satuan Waktu:
+            </label>
+            <select class="form-select form-select-sm" id="delete-range-select">
+              <option value="all">Keseluruhan Waktu (Hapus Semua Log)</option>
+              <option value="date">Per Tanggal Tertentu (Spesifik)</option>
+              <option value="older_than_24h">Lebih dari 24 Jam yang Lalu</option>
+              <option value="older_than_7d">Lebih dari 7 Hari yang Lalu</option>
+              <option value="older_than_30d">Lebih dari 30 Hari yang Lalu</option>
+              <option value="older_than_90d">Lebih dari 90 Hari yang Lalu</option>
+              <option value="before_date">Sebelum Tanggal Tertentu</option>
+            </select>
+          </div>
+
+          <!-- Specific Date Container (Shown when range = 'date') -->
+          <div class="mb-3 d-none" id="delete-date-container">
+            <label for="delete-specific-date" class="form-label fw-semibold small text-secondary">
+              Pilih Tanggal Log:
+            </label>
+            <select class="form-select form-select-sm" id="delete-specific-date">
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+
+          <!-- Before Date Container (Shown when range = 'before_date') -->
+          <div class="mb-3 d-none" id="delete-before-container">
+            <label for="delete-before-date" class="form-label fw-semibold small text-secondary">
+              Hapus Log Sebelum Tanggal:
+            </label>
+            <input type="date" class="form-control form-control-sm" id="delete-before-date">
+          </div>
+
+          <!-- Dynamic Summary / Notice -->
+          <div class="p-2 rounded bg-body-tertiary border small text-muted" id="delete-summary-text">
+            <i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>seluruh data log</strong> pada database.
+          </div>
+        </div>
+        <div class="modal-footer py-2 px-3">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-danger" id="btn-confirm-delete-logs">
+            <i class="bi bi-trash3 me-1"></i>
+            <span id="btn-delete-text">Hapus Sekarang</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" style="position: fixed; top: 1rem; right: 1rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem;"></div>
+
   <!--begin::Script-->
   <!--begin::Third Party Plugin(OverlayScrollbars)-->
   <script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
@@ -342,7 +427,23 @@
   <script>
     let logsTable = null;
     let detailModal = null;
+    let deleteModal = null;
     let currentLogsData = [];
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const colors = { success: '#198754', danger: '#dc3545', error: '#dc3545', warning: '#ffc107', info: '#0d6efd' };
+      const toast = document.createElement('div');
+      toast.style.cssText = `background:${colors[type] || colors.info};color:${type === 'warning' ? '#000' : '#fff'};padding:.5rem 1rem;border-radius:6px;font-size:.84rem;box-shadow:0 2px 8px rgba(0,0,0,.2);max-width:340px;display:flex;align-items:center;gap:.5rem;z-index:9999;`;
+      toast.innerHTML = `<i class="bi bi-${type === 'success' ? 'check-circle' : type === 'warning' ? 'exclamation-triangle' : type === 'danger' ? 'x-circle' : 'info-circle'}"></i> <span>${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity .25s';
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
 
     // Formatter Helpers
     const statusBadgeFormatter = (cell) => {
@@ -425,13 +526,16 @@
     // Initialize Page
     document.addEventListener('DOMContentLoaded', async () => {
       detailModal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+      deleteModal = new bootstrap.Modal(document.getElementById('deleteLogsModal'));
       initTabulator();
+      initDeleteLogsModal();
       await populateDateFilter();
       await loadLogsData();
     });
 
     async function populateDateFilter() {
       const select = document.getElementById('logs-date-filter');
+      const deleteSelect = document.getElementById('delete-specific-date');
       if (!select) return;
 
       let dates = [];
@@ -443,16 +547,129 @@
         console.warn('Failed to fetch log dates:', err.message);
       }
 
-      if (!dates || dates.length === 0) {
-        dates = [new Date().toISOString().split('T')[0]];
+      select.innerHTML = '';
+
+      // Option: All Dates
+      const allOpt = document.createElement('option');
+      allOpt.value = 'all';
+      allOpt.textContent = 'Semua Tanggal (All Dates)';
+      select.appendChild(allOpt);
+
+      if (dates && dates.length > 0) {
+        dates.forEach((d, idx) => {
+          const opt = document.createElement('option');
+          opt.value = d;
+          opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
+          if (idx === 0) opt.selected = true; // Default to latest date
+          select.appendChild(opt);
+        });
+      } else {
+        allOpt.selected = true;
       }
 
-      select.innerHTML = '';
-      dates.forEach((d, idx) => {
-        const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
-        select.appendChild(opt);
+      // Populate delete modal specific date select
+      if (deleteSelect) {
+        deleteSelect.innerHTML = '';
+        if (dates && dates.length > 0) {
+          dates.forEach((d) => {
+            const opt = document.createElement('option');
+            opt.value = d;
+            opt.textContent = d;
+            deleteSelect.appendChild(opt);
+          });
+        } else {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Tidak ada tanggal log yang tersedia';
+          deleteSelect.appendChild(opt);
+        }
+      }
+    }
+
+    function initDeleteLogsModal() {
+      const rangeSelect = document.getElementById('delete-range-select');
+      const dateContainer = document.getElementById('delete-date-container');
+      const beforeContainer = document.getElementById('delete-before-container');
+      const summaryText = document.getElementById('delete-summary-text');
+      const confirmBtn = document.getElementById('btn-confirm-delete-logs');
+      const btnText = document.getElementById('btn-delete-text');
+
+      if (!rangeSelect || !confirmBtn) return;
+
+      // Update today's date as default max for before-date input
+      const beforeDateInput = document.getElementById('delete-before-date');
+      if (beforeDateInput) {
+        const todayStr = new Date().toISOString().split('T')[0];
+        beforeDateInput.value = todayStr;
+        beforeDateInput.max = todayStr;
+      }
+
+      rangeSelect.addEventListener('change', () => {
+        const val = rangeSelect.value;
+        if (val === 'date') {
+          dateContainer?.classList.remove('d-none');
+          beforeContainer?.classList.add('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>seluruh data log pada tanggal yang dipilih</strong>.';
+        } else if (val === 'before_date') {
+          dateContainer?.classList.add('d-none');
+          beforeContainer?.classList.remove('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>semua data log sebelum tanggal yang ditentukan</strong>.';
+        } else if (val === 'older_than_24h') {
+          dateContainer?.classList.add('d-none');
+          beforeContainer?.classList.add('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 24 jam yang lalu</strong>.';
+        } else if (val === 'older_than_7d') {
+          dateContainer?.classList.add('d-none');
+          beforeContainer?.classList.add('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 7 hari yang lalu</strong>.';
+        } else if (val === 'older_than_30d') {
+          dateContainer?.classList.add('d-none');
+          beforeContainer?.classList.add('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 30 hari yang lalu</strong>.';
+        } else if (val === 'older_than_90d') {
+          dateContainer?.classList.add('d-none');
+          beforeContainer?.classList.add('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 90 hari yang lalu</strong>.';
+        } else {
+          // 'all'
+          dateContainer?.classList.add('d-none');
+          beforeContainer?.classList.add('d-none');
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>seluruh data log</strong> pada database dari awal hingga sekarang.';
+        }
+      });
+
+      confirmBtn.addEventListener('click', async () => {
+        const range = rangeSelect.value;
+        const date = document.getElementById('delete-specific-date')?.value || '';
+        const beforeDate = document.getElementById('delete-before-date')?.value || '';
+
+        if (range === 'date' && !date) {
+          showToast('Silakan pilih tanggal log yang ingin dihapus.', 'warning');
+          return;
+        }
+
+        if (range === 'before_date' && !beforeDate) {
+          showToast('Silakan pilih batas tanggal yang ingin dihapus.', 'warning');
+          return;
+        }
+
+        // Disable button and show spinner
+        confirmBtn.disabled = true;
+        const originalText = btnText.textContent;
+        btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Menghapus...';
+
+        try {
+          const res = await SentinelAPI.deleteLogs({ range, date, beforeDate });
+          showToast(res.message || 'Data log berhasil dihapus.', 'success');
+          deleteModal?.hide();
+          await populateDateFilter();
+          await loadLogsData();
+        } catch (err) {
+          showToast(err.message || 'Gagal menghapus data log.', 'danger');
+        } finally {
+          confirmBtn.disabled = false;
+          btnText.textContent = originalText;
+        }
       });
     }
 
@@ -518,7 +735,7 @@
       const status = document.getElementById('logs-status-filter')?.value || '';
       const search = document.getElementById('table-filter')?.value || '';
 
-      let logs = [];
+      let logs = null;
       try {
         if (typeof SentinelAPI !== 'undefined' && SentinelAPI.getLogs) {
           const res = await SentinelAPI.getLogs({
@@ -534,8 +751,8 @@
         console.warn('API getLogs failed, loading fallback data:', err.message);
       }
 
-      // Fallback realistic logs if running on static preview
-      if (!logs || logs.length === 0) {
+      // Fallback realistic logs only if API failed or not available in preview
+      if (logs === null) {
         logs = generateSampleLogs();
       }
 

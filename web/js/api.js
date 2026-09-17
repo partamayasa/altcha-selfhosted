@@ -51,6 +51,13 @@ const SentinelAPI = {
     return this.request('/api/sentinel/logs/dates');
   },
 
+  async deleteLogs(payload = {}) {
+    return this.request('/api/sentinel/logs', {
+      method: 'DELETE',
+      body: JSON.stringify(payload),
+    });
+  },
+
   // Whitelist Management
   async getWhitelist() {
     return this.request('/api/sentinel/whitelist');
