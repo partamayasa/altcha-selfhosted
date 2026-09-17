@@ -12,11 +12,8 @@ COPY src/ ./src/
 COPY web/ ./web/
 COPY altcha.min.js* ./
 
-# Create data directory with appropriate non-root ownership
-RUN mkdir -p database && chown -R node:node /app
-
-# Run as non-root node user for container security
-USER node
+# Create data directory
+RUN mkdir -p database
 
 EXPOSE 3000
 

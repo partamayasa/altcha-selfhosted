@@ -29,11 +29,21 @@ if (isNewMainDb || isNewLogDb) {
   console.log('[Database] Missing database detected. Populating database structure & administrator account...');
 }
 
-// Main transactional database (users, sessions, settings)
-const db = new DatabaseSync(DB_FILE);
+let db;
+let logDb;
 
-// Dedicated request logging database (access_logs)
-const logDb = new DatabaseSync(LOG_DB_FILE);
+try {
+  // Main transactional database (users, sessions, settings)
+  db = new DatabaseSync(DB_FILE);
+
+  // Dedicated request logging database (access_logs)
+  logDb = new DatabaseSync(LOG_DB_FILE);
+} catch (err) {
+  console.error(`[Database Error] Could not initialize SQLite databases: ${err.message}`);
+  console.error(`[Database Error] Target files: ${DB_FILE}, ${LOG_DB_FILE}`);
+  console.error(`[Database Error] Ensure directory has read/write permissions: ${DB_DIR}`);
+  throw err;
+}
 
 function initMainSchema() {
   db.exec(`

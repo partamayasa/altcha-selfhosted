@@ -17,7 +17,6 @@ services:
       - ./web:/app/web
     networks:
       - altcha-net
-      - nginxpm_default
 
   redis:
     image: redis:alpine

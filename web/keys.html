@@ -37,15 +37,17 @@
     .code-box {
       background-color: var(--bs-tertiary-bg);
       border: 1px solid var(--bs-border-color);
-      border-radius: 6px;
-      padding: 10px 14px;
-      font-size: 0.84rem;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.85rem;
       overflow-x: auto;
     }
 
     .code-box pre {
       margin: 0;
-      font-family: SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 0.84rem;
+      line-height: 1.6;
       white-space: pre-wrap;
       word-break: break-all;
     }
@@ -163,11 +165,11 @@
                     <i class="bi bi-code-slash text-info me-1"></i> Quick Integration Guide
                   </h3>
                 </div>
-                <div class="card-body p-3 d-flex flex-column justify-content-between">
-                  <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="text-body small">1. Frontend HTML Widget (Query Parameter)</span>
-                      <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.78rem;" onclick="copyCode('guide-html-snippet')">
+                <div class="card-body p-4 d-flex flex-column justify-content-between">
+                  <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="text-body small fw-medium">1. Frontend HTML Widget (Query Parameter)</span>
+                      <button class="btn btn-outline-secondary btn-sm py-1 px-2" style="font-size: 0.78rem;" onclick="copyCode('guide-html-snippet')">
                         <i class="bi bi-clipboard me-1"></i> Copy
                       </button>
                     </div>
@@ -176,10 +178,10 @@
                     </div>
                   </div>
 
-                  <div>
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="text-body small">2. Backend Verification (HTTP Header)</span>
-                      <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.78rem;" onclick="copyCode('guide-header-snippet')">
+                  <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="text-body small fw-medium">2. Backend Verification (HTTP Header)</span>
+                      <button class="btn btn-outline-secondary btn-sm py-1 px-2" style="font-size: 0.78rem;" onclick="copyCode('guide-header-snippet')">
                         <i class="bi bi-clipboard me-1"></i> Copy
                       </button>
                     </div>
@@ -190,6 +192,13 @@ Content-Type: application/json
 
 {"payload": "&lt;payload_from_widget&gt;"}</pre>
                     </div>
+                  </div>
+
+                  <div class="pt-3 border-top mt-auto d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">Need code snippets for Node.js, PHP, or Python?</span>
+                    <a href="./integration" class="btn btn-outline-info btn-sm py-1 px-2" style="font-size: 0.78rem;">
+                      <i class="bi bi-code-slash me-1"></i> Full Guide &rarr;
+                    </a>
                   </div>
                 </div>
               </div>

@@ -164,16 +164,16 @@
 
             <div class="mb-3">
               <label for="formRePassword" class="form-label small text-secondary mb-1">
-                Repassword <span id="rePasswordRequiredStar" class="text-danger">*</span>
+                Confirm Password <span id="rePasswordRequiredStar" class="text-danger">*</span>
               </label>
               <div class="input-group input-group-sm">
                 <span class="input-group-text"><i class="bi bi-shield-check"></i></span>
-                <input type="password" class="form-control" id="formRePassword" placeholder="Repeat password" autocomplete="new-password" />
+                <input type="password" class="form-control" id="formRePassword" placeholder="Confirm password" autocomplete="new-password" />
                 <button class="btn btn-outline-secondary" type="button" onclick="toggleFieldPasswordVisibility('formRePassword')" title="Show/Hide">
                   <i class="bi bi-eye"></i>
                 </button>
               </div>
-              <div class="form-text" id="rePasswordHelpText">Repeat password to confirm.</div>
+              <div class="form-text" id="rePasswordHelpText">Re-enter password to confirm.</div>
             </div>
 
             <div class="mb-3">
@@ -406,7 +406,7 @@
       document.getElementById('formPassword').required = true;
       document.getElementById('formRePassword').required = true;
       document.getElementById('passwordHelpText').textContent = 'Minimum 6 characters.';
-      document.getElementById('rePasswordHelpText').textContent = 'Repeat password to confirm.';
+      document.getElementById('rePasswordHelpText').textContent = 'Re-enter password to confirm.';
       document.getElementById('userFormAlert').classList.add('d-none');
       userModalInstance.show();
     }
@@ -458,7 +458,7 @@
       }
 
       if (!id && password !== rePassword) {
-        alertEl.textContent = 'Password and Repassword do not match.';
+        alertEl.textContent = 'Password and Confirm Password do not match.';
         alertEl.classList.remove('d-none');
         return;
       }
@@ -470,7 +470,7 @@
       }
 
       if (id && password && password !== rePassword) {
-        alertEl.textContent = 'Password and Repassword do not match.';
+        alertEl.textContent = 'Password and Confirm Password do not match.';
         alertEl.classList.remove('d-none');
         return;
       }

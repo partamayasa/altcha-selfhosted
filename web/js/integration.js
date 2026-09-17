@@ -82,12 +82,13 @@ const SentinelIntegration = {
     const apiKeyDisplay = this.userApiKey || 'YOUR_API_KEY';
 
     const htmlSnippet = `<!-- 1. Load ALTCHA Widget script -->
-<script async defer src="${origin}/altcha.min.js" type="module"></script>
+<script async defer src="${origin}/altcha.min.js"></script>
 
 <!-- 2. Embed widget inside your HTML form with your API key -->
 <form action="/api/submit-form" method="POST">
   <input type="text" name="name" placeholder="Your Name" required />
   
+  <!-- ALTCHA Proof-of-Work Widget -->
   <altcha-widget challengeurl="${origin}/challenge?apiKey=${apiKeyDisplay}"></altcha-widget>
   
   <button type="submit">Submit Form</button>
@@ -98,13 +99,20 @@ import express from 'express';
 
 const app = express();
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
+const ALTCHA_SERVICE_URL = '${origin}';
 const ALTCHA_API_KEY = '${apiKeyDisplay}';
 
 app.post('/api/submit-form', async (req, res) => {
-  const altchaPayload = req.body.altcha; // Automatically populated by widget
+  // Widget automatically attaches base64 payload into 'altcha' field
+  const altchaPayload = req.body.altcha || req.body.payload;
 
-  const verifyResponse = await fetch('${origin}/verify', {
+  if (!altchaPayload) {
+    return res.status(400).json({ error: 'CAPTCHA verification is required.' });
+  }
+
+  const verifyResponse = await fetch(\`\${ALTCHA_SERVICE_URL}/verify\`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -115,19 +123,25 @@ app.post('/api/submit-form', async (req, res) => {
 
   const result = await verifyResponse.json();
   if (!result.success && !result.verification?.verified) {
-    return res.status(400).json({ error: 'Captcha verification failed.' });
+    return res.status(400).json({ error: 'CAPTCHA verification failed.' });
   }
 
-  // Continue processing form
-  res.json({ status: 'Form submitted successfully!' });
+  // Continue processing form...
+  res.json({ success: true, message: 'Form submitted successfully!' });
 });`;
 
     const phpSnippet = `<?php
 // ALTCHA Verification in PHP
-$payload = $_POST['altcha'] ?? '';
-$apiKey  = '${apiKeyDisplay}';
+$payload   = $_POST['altcha'] ?? $_POST['payload'] ?? '';
+$apiKey    = '${apiKeyDisplay}';
+$verifyUrl = '${origin}/verify';
 
-$ch = curl_init('${origin}/verify');
+if (empty($payload)) {
+    http_response_code(400);
+    die(json_encode(['error' => 'CAPTCHA verification is required.']));
+}
+
+$ch = curl_init($verifyUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode(['payload' => $payload]));
@@ -137,16 +151,17 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, [
 ]);
 
 $response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
 $result = json_decode($response, true);
-if (empty($result['success']) && empty($result['verification']['verified'])) {
+if ($httpCode !== 200 || (empty($result['success']) && empty($result['verification']['verified']))) {
     http_response_code(400);
-    die('Spam verification failed.');
+    die(json_encode(['error' => 'CAPTCHA verification failed.']));
 }
 
-// Continue processing form
-echo "Successfully verified!";
+// Continue processing form...
+echo json_encode(['success' => true, 'message' => 'Successfully verified!']);
 ?>`;
 
     const curlSnippet = `# 1. Request PoW Challenge (via Query Parameter or Authorization Header)
