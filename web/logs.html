@@ -172,7 +172,7 @@
             </div>
             <div class="col-sm-6">
               <ol class="breadcrumb float-sm-end mb-0 fs-7">
-                <li class="breadcrumb-item"><a href="./index.html" class="text-decoration-none">Home</a></li>
+                <li class="breadcrumb-item"><a href="./index" class="text-decoration-none">Home</a></li>
                 <li class="breadcrumb-item">Monitoring</li>
                 <li class="breadcrumb-item active" aria-current="page">Audit Logs</li>
               </ol>
@@ -467,7 +467,7 @@
         movableColumns: true,
         placeholder: 'No audit logs found matching criteria.',
         columns: [
-          { title: '#', field: 'id', width: 60, hozAlign: 'center', sorter: 'number' },
+          { title: '#', formatter: 'rownum', width: 60, hozAlign: 'center', headerSort: false },
           { title: 'Time', field: 'timestamp', width: 110, hozAlign: 'center', formatter: timeFormatter },
           { title: 'User', field: 'username', width: 110, hozAlign: 'center', formatter: userBadgeFormatter },
           { title: 'Client IP', field: 'ip', width: 150, formatter: codeFormatter },

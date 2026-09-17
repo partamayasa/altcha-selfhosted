@@ -183,9 +183,19 @@ const SentinelDashboard = {
       hourlyData = this.defaultStats.hourlyActivity;
     }
 
-    const categories = hourlyData.map((item) => `${item.hour}:00`);
-    const totalRequestsData = hourlyData.map((item) => item.count);
-    const verifiedPoWData = hourlyData.map((item) => item.success);
+    // Sort chronologically from 00:00 to 23:00
+    const sortedHourlyData = [...hourlyData].sort((a, b) => {
+      const hA = parseInt(a.hour, 10) || 0;
+      const hB = parseInt(b.hour, 10) || 0;
+      return hA - hB;
+    });
+
+    const categories = sortedHourlyData.map((item) => {
+      const h = String(item.hour || '0').padStart(2, '0');
+      return `${h}:00`;
+    });
+    const totalRequestsData = sortedHourlyData.map((item) => item.count || 0);
+    const verifiedPoWData = sortedHourlyData.map((item) => item.success || 0);
 
     const column_chart_options = {
       series: [
