@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { create, deriveHmacKeySecret, randomInt } from 'altcha-lib/frameworks/express';
 import { deriveKey } from 'altcha-lib/algorithms/pbkdf2';
+import { verify } from 'altcha-lib/frameworks/shared';
+import { verifySolution } from 'altcha-lib';
 import { createClient } from 'redis';
 import { rateLimit } from 'express-rate-limit';
 import { RedisStore } from 'rate-limit-redis';
@@ -11,16 +13,7 @@ import bcrypt from 'bcryptjs';
 import { CONFIG, PATHS } from './config.js';
 import { SentinelDB } from './database.js';
 
-// Migrate existing text logs into SQLite on startup if fresh
-SentinelDB.migrateFromLogFiles(PATHS.logDir);
 
-if (!fs.existsSync(PATHS.logDir)) {
-  try {
-    fs.mkdirSync(PATHS.logDir, { recursive: true });
-  } catch (err) {
-    console.error('Failed to create log directory:', err.message);
-  }
-}
 
 function getNowInTimezone(tz = CONFIG.timezone) {
   const now = new Date();
@@ -65,19 +58,8 @@ function getNowInTimezone(tz = CONFIG.timezone) {
   }
 }
 
-function getLogFilePath(customDate = null) {
-  const dateStr = customDate || getNowInTimezone().date;
-  return path.join(PATHS.logDir, `altcha-log.${dateStr}.log`);
-}
-
 function writeAccessLog(entry, structuredData = null) {
   console.log(entry);
-  const logFile = getLogFilePath(structuredData?.date);
-  fs.appendFile(logFile, entry + '\n', 'utf8', (err) => {
-    if (err) {
-      console.error('Failed to write access log:', err.message);
-    }
-  });
 
   if (structuredData) {
     SentinelDB.insertLog(structuredData);
@@ -158,79 +140,9 @@ app.use((req, res, next) => {
   next();
 });
 
-function getWhitelistConfig() {
-  if (fs.existsSync(PATHS.whitelistFile)) {
-    try {
-      const data = fs.readFileSync(PATHS.whitelistFile, 'utf-8');
-      const parsed = JSON.parse(data);
-      if (parsed && typeof parsed === 'object') {
-        return {
-          enabled: parsed.enabled !== false,
-          allowDirectAccess: parsed.allowDirectAccess === true,
-          domains: Array.isArray(parsed.domains) ? parsed.domains : []
-        };
-      }
-    } catch (err) {
-      console.error('Error reading whitelist file:', err.message);
-    }
-  }
-
-  if (CONFIG.corsOrigin && CONFIG.corsOrigin !== '*') {
-    return {
-      enabled: true,
-      allowDirectAccess: false,
-      domains: CONFIG.corsOrigin.split(',').map((o) => o.trim()).filter(Boolean)
-    };
-  }
-
-  return {
-    enabled: false,
-    allowDirectAccess: true,
-    domains: []
-  };
-}
-
-function matchDomainRule(origin, rule) {
-  if (!origin || !rule) return false;
-  if (rule === '*') return true;
-  if (origin === rule) return true;
-
-  if (rule.includes('*')) {
-    try {
-      const ruleUrl = new URL(rule.replace('*.', 'wildcard-temp.'));
-      const originUrl = new URL(origin);
-
-      if (ruleUrl.protocol !== originUrl.protocol) return false;
-      if (ruleUrl.port !== originUrl.port) return false;
-
-      const ruleHostSuffix = ruleUrl.hostname.replace('wildcard-temp.', '');
-      return (
-        originUrl.hostname === ruleHostSuffix ||
-        originUrl.hostname.endsWith('.' + ruleHostSuffix)
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
-}
-
 app.use(cors({
-  origin: (origin, callback) => {
-    const config = getWhitelistConfig();
-    if (!config.enabled) {
-      return callback(null, true);
-    }
-    if (!origin) {
-      return callback(null, true);
-    }
-    const isAllowed = config.domains.some((rule) => matchDomainRule(origin, rule));
-    if (isAllowed) {
-      return callback(null, true);
-    }
-    return callback(null, false);
-  }
+  origin: true,
+  credentials: true
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -281,6 +193,62 @@ const requireAdmin = (req, res, next) => {
   }
   next();
 };
+
+// ── Helper: parse allowed_origins JSON string from user record ───────────────
+function parseAllowedOrigins(user) {
+  if (!user || !user.allowed_origins) return null;
+  try {
+    const parsed = JSON.parse(user.allowed_origins);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Helper: Match incoming request origin against a whitelist rule ───────────
+function matchAllowedOriginRule(requestOrigin, rule) {
+  if (!requestOrigin || !rule) return false;
+  const r = rule.trim();
+  if (r === '*') return true;
+
+  // Clean request origin
+  const reqNorm = requestOrigin.trim().toLowerCase().replace(/\/+$/, '');
+  const ruleNorm = r.toLowerCase().replace(/\/+$/, '');
+
+  // 1. Exact match
+  if (reqNorm === ruleNorm) return true;
+
+  // 2. Normalize localhost <-> 127.0.0.1 for local environments
+  const reqL = reqNorm.replace('://127.0.0.1', '://localhost');
+  const ruleL = ruleNorm.replace('://127.0.0.1', '://localhost');
+  if (reqL === ruleL) return true;
+
+  // 3. Parse URLs for hostname/port matching
+  try {
+    const reqUrl = new URL(reqNorm.includes('://') ? reqNorm : `http://${reqNorm}`);
+    const reqHostname = reqUrl.hostname;
+    const reqHost = reqUrl.host; // includes port if non-standard
+
+    // Wildcard match: *.domain.com
+    if (ruleNorm.includes('*.')) {
+      const cleanRuleHost = ruleNorm.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      const baseDomain = cleanRuleHost.replace('*.', '');
+      if (reqHostname === baseDomain || reqHostname.endsWith('.' + baseDomain)) {
+        return true;
+      }
+    }
+
+    // Rule specified without protocol: e.g. "example.com" or "example.com:3000"
+    if (!ruleNorm.includes('://')) {
+      const cleanRule = ruleNorm.replace(/\/.*$/, '');
+      if (cleanRule === reqHost || cleanRule === reqHostname) {
+        return true;
+      }
+    }
+  } catch {}
+
+  return false;
+}
 
 // ── requireApiKey middleware for ALTCHA endpoints ────────────────────────────
 const requireApiKey = (req, res, next) => {
@@ -338,6 +306,60 @@ const requireApiKey = (req, res, next) => {
       error: 'Unauthorized: Invalid API key.',
       success: false
     });
+  }
+
+  // ── Strict Domain Whitelist (Origin Binding) ───────────────────────────────
+  // Manager UI sessions are exempt from origin binding checks
+  const sessionUser = getSessionUser(req);
+  const isManagerRequest = !!sessionUser;
+
+  if (!isManagerRequest) {
+    const allowedOrigins = parseAllowedOrigins(user);
+    const isChallengeReq = req.path === '/challenge' || req.path === '/altcha/challenge';
+
+    // Strict Whitelist: If no domains are whitelisted for this key, block all external requests
+    if (!allowedOrigins || allowedOrigins.length === 0) {
+      res.locals.logError = 'No allowed domains configured for this API key';
+      return res.status(403).json({
+        error: 'Forbidden: No domains have been registered in the whitelist for this API key. Please add your allowed domain in Key & Domain Manager.',
+        success: false
+      });
+    }
+
+    // Determine incoming Origin or Referer
+    const origin = req.headers['x-origin'] || req.headers['origin'] || null;
+    const referer = req.headers['x-referer'] || req.headers['referer'] || null;
+
+    let requestOrigin = origin;
+    if (!requestOrigin && referer) {
+      try { requestOrigin = new URL(referer).origin; } catch { requestOrigin = null; }
+    }
+
+    // Direct access without Origin/Referer header
+    if (!requestOrigin) {
+      // For /challenge (browser widget requests), Origin or Referer is strictly required
+      if (isChallengeReq) {
+        // If wildcard '*' is in the whitelist, direct access is permitted
+        if (!allowedOrigins.includes('*')) {
+          res.locals.logError = 'Direct request without Origin/Referer blocked';
+          return res.status(403).json({
+            error: 'Forbidden: Direct request without Origin or Referer header is blocked. Only registered whitelist domains are permitted.',
+            success: false
+          });
+        }
+      }
+    }
+
+    if (requestOrigin) {
+      const isAllowed = allowedOrigins.some(allowed => matchAllowedOriginRule(requestOrigin, allowed));
+      if (!isAllowed) {
+        res.locals.logError = `Origin "${requestOrigin}" not in whitelist for API key`;
+        return res.status(403).json({
+          error: `Forbidden: Origin "${requestOrigin}" is not in the allowed domain whitelist for this API key. All other domains are blocked.`,
+          success: false
+        });
+      }
+    }
   }
 
   req.apiKeyUser = user;
@@ -456,7 +478,7 @@ const altcha = create({
   createChallengeParameters: () => ({
     algorithm: CONFIG.algorithm,
     cost: CONFIG.cost,
-    counter: randomInt(CONFIG.cost, CONFIG.cost * 2),
+    counter: randomInt(Math.max(20, Math.floor(CONFIG.cost * 0.2)), CONFIG.cost),
     expiresAt: new Date(Date.now() + CONFIG.expiresIn * 1000),
   }),
   deriveKey,
@@ -487,41 +509,23 @@ app.use((req, res, next) => {
   next();
 });
 
-const whitelistGuard = (req, res, next) => {
-  const config = getWhitelistConfig();
-  if (!config.enabled) return next();
-
-  const origin = req.headers['x-origin'] || req.headers.origin;
-  const referer = req.headers['x-referer'] || req.headers.referer;
-
-  if (!origin && !referer) {
-    if (config.allowDirectAccess || req.path === '/verify' || req.path === '/altcha/verify') {
-      return next();
-    }
-    return res.status(403).json({
-      error: 'Forbidden: Direct access without Origin or Referer header is not allowed.'
-    });
+// Ensure database is populated and ready on first access
+let isDbInitialized = false;
+app.use((req, res, next) => {
+  if (!isDbInitialized) {
+    SentinelDB.ensureInitialized();
+    isDbInitialized = true;
   }
-
-  const isOriginAllowed = origin && config.domains.some((rule) => matchDomainRule(origin, rule));
-  let isRefererAllowed = false;
-  if (referer) {
-    try {
-      const refererOrigin = new URL(referer).origin;
-      isRefererAllowed = config.domains.some((rule) => matchDomainRule(refererOrigin, rule));
-    } catch { }
-  }
-
-  if (isOriginAllowed || isRefererAllowed) {
-    return next();
-  }
-
-  return res.status(403).json({
-    error: 'Forbidden: Origin or Referer is not in the allowed domain whitelist.'
-  });
-};
+  next();
+});
 
 // ── Auth Routes ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/auth/challenge
+ * Generates an ALTCHA challenge for the manager login page.
+ */
+app.get('/api/auth/challenge', applyRateLimit, altcha.challengeHandler);
 
 /**
  * POST /api/auth/login
@@ -529,10 +533,26 @@ const whitelistGuard = (req, res, next) => {
  * Sets HttpOnly cookie on success.
  */
 app.post('/api/auth/login', async (req, res) => {
-  const { username, password } = req.body || {};
+  const { username, password, altcha } = req.body || {};
 
   if (!username || !password) {
     return res.status(400).json({ error: 'Username and password are required.' });
+  }
+
+  // ── Verify ALTCHA CAPTCHA payload ───────────────────────────
+  if (!altcha) {
+    return res.status(400).json({ error: 'CAPTCHA verification is required. Please complete the CAPTCHA.' });
+  }
+
+  try {
+    const verifyResult = await verify(altcha, deriveKey, hmacSignatureSecret, hmacKeySignatureSecret, store);
+    if (!verifyResult || !verifyResult.verification || !verifyResult.verification.verified) {
+      const errMsg = verifyResult?.error || 'CAPTCHA verification failed. Please try again.';
+      return res.status(400).json({ error: errMsg });
+    }
+  } catch (err) {
+    console.error('[Login] CAPTCHA verification error:', err.message);
+    return res.status(400).json({ error: 'CAPTCHA verification failed. Please try again.' });
   }
 
   const user = SentinelDB.getUserByUsername(String(username).trim());
@@ -595,8 +615,47 @@ app.get('/api/auth/me', (req, res) => {
     username: user.username,
     full_name: user.fullName || user.full_name || '',
     role: user.role,
-    apiKey: user.apiKey
+    apiKey: user.apiKey,
+    allowedOrigins: user.allowedOrigins || null
   });
+});
+
+/**
+ * POST /api/auth/change-password
+ * Body: { current_password, new_password }
+ * Changes the authenticated user's password.
+ */
+app.post('/api/auth/change-password', requireAuth, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body || {};
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current password and new password are required.' });
+    }
+    if (String(new_password).length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+    }
+
+    const user = SentinelDB.getUserByUsername(req.authUser.username);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const valid = await bcrypt.compare(String(current_password), user.password_hash);
+    if (!valid) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+
+    const newHash = bcrypt.hashSync(String(new_password), 12);
+    const updated = SentinelDB.updatePassword(user.username, newHash);
+    if (!updated) {
+      return res.status(500).json({ error: 'Failed to update password.' });
+    }
+
+    return res.json({ success: true, message: 'Password has been changed successfully.' });
+  } catch (err) {
+    console.error('[ChangePassword] Error:', err.message);
+    return res.status(500).json({ error: 'Failed to change password: ' + err.message });
+  }
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -649,57 +708,6 @@ app.get('/api/sentinel/logs', requireAuth, (req, res) => {
 
 app.get('/api/sentinel/logs/dates', requireAuth, (req, res) => {
   res.json(SentinelDB.getAvailableDates());
-});
-
-app.get('/api/sentinel/whitelist', requireAuth, (req, res) => {
-  res.json(getWhitelistConfig());
-});
-
-app.post('/api/sentinel/whitelist', requireAuth, (req, res) => {
-  const { enabled, allowDirectAccess, domains } = req.body;
-  if (typeof enabled !== 'boolean' || typeof allowDirectAccess !== 'boolean' || !Array.isArray(domains)) {
-    return res.status(400).json({ error: 'Invalid whitelist structure provided.' });
-  }
-
-  const sanitizedDomains = domains
-    .filter((d) => typeof d === 'string' && d.trim().length > 0)
-    .map((d) => d.trim());
-
-  const newConfig = {
-    enabled,
-    allowDirectAccess,
-    domains: sanitizedDomains
-  };
-
-  try {
-    fs.writeFileSync(PATHS.whitelistFile, JSON.stringify(newConfig, null, 2), 'utf8');
-    res.json({
-      success: true,
-      message: 'Whitelist configuration updated successfully.',
-      config: newConfig
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to write whitelist file: ' + err.message });
-  }
-});
-
-app.post('/api/sentinel/whitelist/test', requireAuth, (req, res) => {
-  const { origin } = req.body;
-  if (!origin) {
-    return res.status(400).json({ error: 'Origin parameter is required.' });
-  }
-
-  const config = getWhitelistConfig();
-  if (!config.enabled) {
-    return res.json({ allowed: true, matchedRule: 'Whitelist is currently disabled (All allowed)' });
-  }
-
-  const matched = config.domains.find((rule) => matchDomainRule(origin, rule));
-  if (matched) {
-    return res.json({ allowed: true, matchedRule: matched });
-  }
-
-  return res.json({ allowed: false, matchedRule: null });
 });
 
 app.get('/api/sentinel/config', requireAuth, (req, res) => {
@@ -802,7 +810,7 @@ app.get('/api/sentinel/users', requireAuth, requireAdmin, (req, res) => {
 // POST /api/sentinel/users — Create new user
 app.post('/api/sentinel/users', requireAuth, requireAdmin, (req, res) => {
   try {
-    const { username, password, role, api_key, full_name, fullName } = req.body || {};
+    const { username, password, role, api_key, full_name, fullName, allowed_origins } = req.body || {};
     if (!username || !username.trim()) {
       return res.status(400).json({ error: 'Username is required.' });
     }
@@ -815,12 +823,21 @@ app.post('/api/sentinel/users', requireAuth, requireAdmin, (req, res) => {
       return res.status(400).json({ error: `Username "${username.trim()}" is already taken.` });
     }
 
+    // Parse allowed_origins: accept array or newline-separated string
+    let originsArray = null;
+    if (allowed_origins) {
+      originsArray = Array.isArray(allowed_origins)
+        ? allowed_origins.filter(Boolean)
+        : String(allowed_origins).split('\n').map(s => s.trim()).filter(Boolean);
+    }
+
     const newUser = SentinelDB.createUser({
       username: username.trim(),
       fullName: (full_name !== undefined ? full_name : fullName) || '',
       password,
       role: role === 'administrator' ? 'administrator' : 'user',
-      apiKey: api_key ? String(api_key).trim() : null
+      apiKey: api_key ? String(api_key).trim() : null,
+      allowedOrigins: originsArray
     });
 
     res.status(201).json({ success: true, user: newUser });
@@ -842,7 +859,7 @@ app.put('/api/sentinel/users/:id', requireAuth, requireAdmin, (req, res) => {
       return res.status(404).json({ error: 'User not found.' });
     }
 
-    const { username, password, role, api_key, full_name, fullName } = req.body || {};
+    const { username, password, role, api_key, full_name, fullName, allowed_origins } = req.body || {};
 
     // Prevent removing administrator role from own account
     if (req.authUser.id === userId && role && role !== 'administrator') {
@@ -860,17 +877,87 @@ app.put('/api/sentinel/users/:id', requireAuth, requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
     }
 
+    // Parse allowed_origins: accept array or newline-separated string
+    let originsArray = undefined; // undefined = don't update
+    if (allowed_origins !== undefined) {
+      if (allowed_origins === null || allowed_origins === '') {
+        originsArray = null; // clear bindings
+      } else {
+        originsArray = Array.isArray(allowed_origins)
+          ? allowed_origins.filter(Boolean)
+          : String(allowed_origins).split('\n').map(s => s.trim()).filter(Boolean);
+        if (originsArray.length === 0) originsArray = null;
+      }
+    }
+
     const updated = SentinelDB.updateUser(userId, {
       username: username?.trim(),
       fullName: full_name !== undefined ? full_name : fullName,
       password: password ? password.trim() : null,
       role,
-      apiKey: api_key !== undefined ? String(api_key).trim() : undefined
+      apiKey: api_key !== undefined ? String(api_key).trim() : undefined,
+      allowedOrigins: originsArray
     });
 
     res.json({ success: true, user: updated });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update user: ' + err.message });
+  }
+});
+
+// PUT /api/sentinel/users/:id/allowed-origins — Update per-key domain binding
+app.put('/api/sentinel/users/:id/allowed-origins', requireAuth, (req, res) => {
+  try {
+    const userId = parseInt(req.params.id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ error: 'Invalid user ID.' });
+    }
+
+    // Allow user to update their own domains, or administrator to update any user's domains
+    if (req.authUser.role !== 'administrator' && req.authUser.id !== userId) {
+      return res.status(403).json({ error: 'Forbidden. You do not have permission to manage this user\'s domains.' });
+    }
+
+    const existing = SentinelDB.getUserById(userId);
+    if (!existing) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const { allowed_origins } = req.body || {};
+
+    let originsArray = null;
+    if (allowed_origins) {
+      originsArray = Array.isArray(allowed_origins)
+        ? allowed_origins.map(s => s.trim()).filter(Boolean)
+        : String(allowed_origins).split('\n').map(s => s.trim()).filter(Boolean);
+      if (originsArray.length === 0) originsArray = null;
+    }
+
+    const updated = SentinelDB.updateUser(userId, { allowedOrigins: originsArray });
+    res.json({ success: true, user: updated, allowedOrigins: updated.allowed_origins });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update allowed origins: ' + err.message });
+  }
+});
+
+// PUT /api/sentinel/keys/my-allowed-origins — Update own allowed domains
+app.put('/api/sentinel/keys/my-allowed-origins', requireAuth, (req, res) => {
+  try {
+    const userId = req.authUser.id;
+    const { allowed_origins } = req.body || {};
+
+    let originsArray = null;
+    if (allowed_origins) {
+      originsArray = Array.isArray(allowed_origins)
+        ? allowed_origins.map(s => s.trim()).filter(Boolean)
+        : String(allowed_origins).split('\n').map(s => s.trim()).filter(Boolean);
+      if (originsArray.length === 0) originsArray = null;
+    }
+
+    const updated = SentinelDB.updateUser(userId, { allowedOrigins: originsArray });
+    res.json({ success: true, user: updated, allowedOrigins: updated.allowed_origins });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update allowed origins: ' + err.message });
   }
 });
 
@@ -954,8 +1041,8 @@ const PROTECTED_PAGES = new Set([
   '/logs.html',
   '/pow-policy',
   '/pow-policy.html',
-  '/playground',
-  '/playground.html',
+  '/integration',
+  '/integration.html',
   '/users',
   '/users.html',
   '/keys',
@@ -963,6 +1050,11 @@ const PROTECTED_PAGES = new Set([
   '/settings',
   '/settings.html'
 ]);
+
+// Redirect legacy /playground path to /integration
+app.get(['/playground', '/playground.html', '/manager/playground', '/manager/playground.html'], (req, res) => {
+  res.redirect(301, '/integration');
+});
 
 app.use((req, res, next) => {
   let cleanPath = req.path;
@@ -974,8 +1066,9 @@ app.use((req, res, next) => {
     if (!user) {
       return res.redirect('/login');
     }
-    // Users with role 'user' are strictly restricted to /keys
-    if (user.role === 'user' && cleanPath !== '/keys' && cleanPath !== '/keys.html') {
+    // Users with role 'user' can access /keys and /integration
+    const userAllowedPaths = new Set(['/keys', '/keys.html', '/integration', '/integration.html']);
+    if (user.role === 'user' && !userAllowedPaths.has(cleanPath)) {
       return res.redirect('/keys');
     }
   }
@@ -998,10 +1091,6 @@ const altchaJsPath = fs.existsSync(path.join(PATHS.webDir, 'altcha.min.js'))
   : path.join(PATHS.root, 'altcha.min.js');
 app.use('/altcha.min.js', express.static(altchaJsPath));
 
-// Optionally serve tools in dev/debug
-if (fs.existsSync(PATHS.toolsDir)) {
-  app.use('/tools', express.static(PATHS.toolsDir));
-}
 
 app.get('/health', applyRateLimit, (req, res) => {
   res.json({
@@ -1010,11 +1099,11 @@ app.get('/health', applyRateLimit, (req, res) => {
   });
 });
 
-app.get('/challenge', applyRateLimit, whitelistGuard, requireApiKey, altcha.challengeHandler);
-app.get('/altcha/challenge', applyRateLimit, whitelistGuard, requireApiKey, altcha.challengeHandler);
+app.get('/challenge', applyRateLimit, requireApiKey, altcha.challengeHandler);
+app.get('/altcha/challenge', applyRateLimit, requireApiKey, altcha.challengeHandler);
 
-app.post('/verify', applyRateLimit, whitelistGuard, requireApiKey, altcha.verifyHandler);
-app.post('/altcha/verify', applyRateLimit, whitelistGuard, requireApiKey, altcha.verifyHandler);
+app.post('/verify', applyRateLimit, requireApiKey, altcha.verifyHandler);
+app.post('/altcha/verify', applyRateLimit, requireApiKey, altcha.verifyHandler);
 
 app.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`ALTCHA server (v2) is ready to run on http://${CONFIG.host}:${CONFIG.port}`);

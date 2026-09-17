@@ -48,7 +48,7 @@
         <li class="nav-item" data-role="all">
           <a href="./keys" class="nav-link" data-menu-key="keys" data-tab="keys">
             <i class="nav-icon bi bi-key"></i>
-            <p>Key Manager</p>
+            <p>Key &amp; Domain Manager</p>
           </a>
         </li>
 
@@ -78,19 +78,26 @@
         </li>
         <!--end::Group SYSTEM CONFIGURATION-->
 
-        <!--begin::Group DEVELOPER (Admin Only)-->
-        <li class="nav-header" data-role="admin-only">DEVELOPER</li>
+        <!--begin::Group DEVELOPER-->
+        <li class="nav-header" data-role="all">DEVELOPER</li>
 
-        <li class="nav-item" data-role="admin-only">
-          <a href="./playground" class="nav-link" data-menu-key="playground" data-tab="playground">
-            <i class="nav-icon bi bi-play-circle"></i>
-            <p>Playground &amp; Snippets</p>
+        <li class="nav-item" data-role="all">
+          <a href="./integration" class="nav-link" data-menu-key="integration" data-tab="integration">
+            <i class="nav-icon bi bi-code-slash"></i>
+            <p>API &amp; Integration</p>
           </a>
         </li>
         <!--end::Group DEVELOPER-->
 
         <!--begin::Group ACCOUNT (All Users)-->
         <li class="nav-header" data-role="all">ACCOUNT</li>
+
+        <li class="nav-item" data-role="all">
+          <a href="#" class="nav-link" onclick="event.preventDefault(); window.AuthGuard && window.AuthGuard.openChangePasswordModal();">
+            <i class="nav-icon bi bi-key"></i>
+            <p>Change Password</p>
+          </a>
+        </li>
 
         <li class="nav-item" data-role="all">
           <a href="#" class="nav-link text-danger" onclick="event.preventDefault(); window.AuthGuard && window.AuthGuard.logout();">
