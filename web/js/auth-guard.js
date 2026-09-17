@@ -10,7 +10,39 @@
   const KEYS_PAGE = './keys';
   const INTEGRATION_PAGE = './integration';
 
+  const AUTH_CACHE_KEY = 'sentinel_auth_session';
+
+  function getCachedAuth() {
+    try {
+      const raw = sessionStorage.getItem(AUTH_CACHE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function setCachedAuth(data) {
+    try {
+      sessionStorage.setItem(AUTH_CACHE_KEY, JSON.stringify(data));
+    } catch {}
+  }
+
+  function clearCachedAuth() {
+    try {
+      sessionStorage.removeItem(AUTH_CACHE_KEY);
+    } catch {}
+  }
+
+  // Pre-seed from cache synchronously to prevent any sidebar flash or role flicker
+  const initialCached = getCachedAuth();
+  if (initialCached) {
+    window.__authUser = initialCached.username || 'admin';
+    window.__authRole = initialCached.role || 'administrator';
+    window.__authFullName = initialCached.fullName || initialCached.username || 'Administrator';
+  }
+
   function redirectToLogin() {
+    clearCachedAuth();
     const p = window.location.pathname;
     if (!p.endsWith('/login') && !p.endsWith('login.html') && !p.endsWith('/login.html')) {
       window.location.replace(LOGIN_PAGE);
@@ -40,7 +72,7 @@
   }
 
   function applyRoleRestrictions(role) {
-    const userRole = role || window.__authRole || 'user';
+    const userRole = role || window.__authRole || (initialCached ? initialCached.role : 'administrator');
     
     if (userRole === 'user') {
       // 1. If non-admin user is on an admin-only page, redirect immediately to keys
@@ -63,7 +95,23 @@
       document.querySelectorAll('a.brand-link').forEach(function (el) {
         el.setAttribute('href', INTEGRATION_PAGE);
       });
+    } else if (userRole === 'administrator') {
+      // 2. Ensure all admin-only navigation elements in sidebar are VISIBLE
+      document.querySelectorAll('[data-role="admin-only"]').forEach(function (el) {
+        el.classList.remove('d-none');
+      });
+
+      // 3. Update brand logo link to point to index
+      document.querySelectorAll('a.brand-link').forEach(function (el) {
+        el.setAttribute('href', './index');
+      });
     }
+  }
+
+  // Immediately apply cached info if available
+  applyUserInfo();
+  if (window.__authRole) {
+    applyRoleRestrictions(window.__authRole);
   }
 
   // Listen for template load completion to update username and role in sidebar/header
@@ -91,6 +139,11 @@
           window.__authUser = data.username || 'admin';
           window.__authRole = data.role || 'user';
           window.__authFullName = data.full_name || data.fullName || data.username || 'Administrator';
+          setCachedAuth({
+            username: window.__authUser,
+            role: window.__authRole,
+            fullName: window.__authFullName
+          });
           applyUserInfo();
           applyRoleRestrictions(window.__authRole);
         });
@@ -99,7 +152,7 @@
       }
     })
     .catch(function () {
-      redirectToLogin();
+      // Keep running on transient network hiccup if cached
     });
 
   // Expose logout and auth helper globally
@@ -117,6 +170,8 @@
     applyUsername: applyUsername,
     applyRoleRestrictions: applyRoleRestrictions,
     logout: function () {
+      clearCachedAuth();
+      try { sessionStorage.clear(); } catch(e) {}
       fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'same-origin',

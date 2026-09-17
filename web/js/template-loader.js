@@ -1,6 +1,8 @@
 /**
  * AdminLTE v4 Reusable Template Loader
  * Loads header, sidebar, footer and partial templates dynamically.
+ * Features instant sessionStorage caching & synchronous pre-hydration
+ * to eliminate layout shift and sidebar flash during menu navigation.
  */
 (function (global) {
   'use strict';
@@ -14,6 +16,22 @@
     highlightActiveMenu: true,
   };
 
+  const CACHE_PREFIX = 'sentinel_tpl_';
+
+  function getCachedTemplate(key) {
+    try {
+      return sessionStorage.getItem(CACHE_PREFIX + key);
+    } catch {
+      return null;
+    }
+  }
+
+  function setCachedTemplate(key, text) {
+    try {
+      sessionStorage.setItem(CACHE_PREFIX + key, text);
+    } catch {}
+  }
+
   /**
    * Determine base directory for templates based on document or script location.
    */
@@ -25,27 +43,76 @@
   }
 
   /**
-   * Fetch template file text.
+   * Fetch template file text with background revalidation.
    */
   async function fetchTemplate(url) {
-    const cacheBuster = `${url}${url.includes('?') ? '&' : '?'}_t=${Date.now()}`;
-    const response = await fetch(cacheBuster, { cache: 'no-store' });
+    const cached = getCachedTemplate(url);
+    if (cached) {
+      // Revalidate in background to keep template up-to-date without blocking
+      fetch(url)
+        .then((r) => (r.ok ? r.text() : null))
+        .then((fresh) => {
+          if (fresh && fresh !== cached) {
+            setCachedTemplate(url, fresh);
+          }
+        })
+        .catch(() => {});
+      return cached;
+    }
+
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to load template from ${url} (HTTP ${response.status})`);
     }
-    return await response.text();
+    const text = await response.text();
+    setCachedTemplate(url, text);
+    return text;
   }
 
   /**
    * Insert template HTML string in place of a target element.
    */
   function replaceWithHtml(targetEl, htmlString) {
+    if (!targetEl || !targetEl.parentNode) return null;
     const template = document.createElement('template');
     template.innerHTML = htmlString.trim();
     const fragment = template.content;
     const firstElement = fragment.firstElementChild;
     targetEl.replaceWith(fragment);
     return firstElement;
+  }
+
+  /**
+   * Synchronously hydrate templates from sessionStorage cache if available.
+   * Runs immediately on script load to eliminate any visible delay.
+   */
+  function hydrateImmediate() {
+    try {
+      const baseDir = resolveBaseDir(defaultOptions.baseDir).replace(/\/+$/, '');
+
+      const headerPlaceholder = document.querySelector(defaultOptions.headerSelector);
+      if (headerPlaceholder) {
+        const url = headerPlaceholder.getAttribute('data-src') || `${baseDir}/header.html`;
+        const cached = getCachedTemplate(url);
+        if (cached) replaceWithHtml(headerPlaceholder, cached);
+      }
+
+      const sidebarPlaceholder = document.querySelector(defaultOptions.sidebarSelector);
+      if (sidebarPlaceholder) {
+        const url = sidebarPlaceholder.getAttribute('data-src') || `${baseDir}/sidebar.html`;
+        const cached = getCachedTemplate(url);
+        if (cached) replaceWithHtml(sidebarPlaceholder, cached);
+      }
+
+      const footerPlaceholder = document.querySelector(defaultOptions.footerSelector);
+      if (footerPlaceholder) {
+        const url = footerPlaceholder.getAttribute('data-src') || `${baseDir}/footer.html`;
+        const cached = getCachedTemplate(url);
+        if (cached) replaceWithHtml(footerPlaceholder, cached);
+      }
+
+      applyActiveMenu();
+    } catch {}
   }
 
   /**
@@ -59,6 +126,10 @@
       global.OverlayScrollbarsGlobal?.OverlayScrollbars !== undefined &&
       !isMobile
     ) {
+      // Check if already initialized to avoid re-wrapping
+      if (sidebarWrapper.getAttribute('data-overlayscrollbars-initialize') !== null) {
+        return;
+      }
       global.OverlayScrollbarsGlobal.OverlayScrollbars(sidebarWrapper, {
         scrollbars: {
           theme: 'os-theme-light',
@@ -217,6 +288,8 @@
       applyActiveMenu();
     }
 
+    initTabListeners();
+
     // Dispatch global completion event
     document.dispatchEvent(new CustomEvent('templates:loaded', { bubbles: true }));
   }
@@ -224,13 +297,18 @@
   // Export API
   global.TemplateLoader = {
     load: loadTemplates,
+    hydrateImmediate,
     initSidebarScrollbar,
     applyActiveMenu,
   };
 
-  // Auto-run if placeholders are present
+  // Immediate pre-hydration attempt as soon as this script executes
+  hydrateImmediate();
+
+  // Run full load on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
+      hydrateImmediate();
       loadTemplates();
     });
   } else {

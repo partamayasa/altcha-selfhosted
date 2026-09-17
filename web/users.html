@@ -32,13 +32,25 @@
 </head>
 <!--end::Head-->
 
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="users">
+<body class="hold-transition layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="users">
   <div class="app-wrapper">
     <!-- Header (Loaded via Template) -->
     <div data-template="header"></div>
 
     <!-- Sidebar (Loaded via Template) -->
     <div data-template="sidebar"></div>
+    <script>
+      (function(){
+        try {
+          var s = sessionStorage.getItem('sentinel_tpl_./templates/sidebar.html');
+          var el = document.querySelector('[data-template="sidebar"]');
+          if (s && el) { var t = document.createElement('template'); t.innerHTML = s.trim(); el.replaceWith(t.content); }
+          var h = sessionStorage.getItem('sentinel_tpl_./templates/header.html');
+          var hel = document.querySelector('[data-template="header"]');
+          if (h && hel) { var th = document.createElement('template'); th.innerHTML = h.trim(); hel.replaceWith(th.content); }
+        } catch(e){}
+      })();
+    </script>
 
     <!-- Main Content -->
     <main class="app-main">

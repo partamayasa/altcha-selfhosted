@@ -48,13 +48,25 @@
 </head>
 <!--end::Head-->
 
-<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="settings">
+<body class="hold-transition layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="settings">
   <div class="app-wrapper">
     <!-- Header (Loaded via Template) -->
     <div data-template="header"></div>
 
     <!-- Sidebar (Loaded via Template) -->
     <div data-template="sidebar"></div>
+    <script>
+      (function(){
+        try {
+          var s = sessionStorage.getItem('sentinel_tpl_./templates/sidebar.html');
+          var el = document.querySelector('[data-template="sidebar"]');
+          if (s && el) { var t = document.createElement('template'); t.innerHTML = s.trim(); el.replaceWith(t.content); }
+          var h = sessionStorage.getItem('sentinel_tpl_./templates/header.html');
+          var hel = document.querySelector('[data-template="header"]');
+          if (h && hel) { var th = document.createElement('template'); th.innerHTML = h.trim(); hel.replaceWith(th.content); }
+        } catch(e){}
+      })();
+    </script>
 
     <!-- Main Content -->
     <main class="app-main">
@@ -124,19 +136,7 @@
                       <div class="form-text">Used across integration tutorials, code snippets, and widget embed URLs in production.</div>
                     </div>
 
-                    <!-- 3. App Port -->
-                    <div class="mb-3">
-                      <label for="setting-app-port" class="form-label small text-secondary mb-1">
-                        Application Service Port <span class="text-danger">*</span>
-                      </label>
-                      <div class="input-group input-group-sm">
-                        <span class="input-group-text"><i class="bi bi-ethernet"></i></span>
-                        <input type="number" class="form-control font-monospace" id="setting-app-port" placeholder="8000" min="1" max="65535" required />
-                      </div>
-                      <div class="form-text">The TCP port the self-hosted engine listens on. Port changes take effect when the server restarts.</div>
-                    </div>
-
-                    <!-- 4. App Tagline -->
+                    <!-- 3. App Tagline -->
                     <div class="mb-4">
                       <label for="setting-app-tagline" class="form-label small text-secondary mb-1">
                         Application Tagline
@@ -258,7 +258,6 @@ Content-Type: application/json
 
         document.getElementById('setting-app-name').value = data.app_name || 'ALTCHA Manager';
         document.getElementById('setting-app-url').value = data.app_url || window.location.origin;
-        document.getElementById('setting-app-port').value = data.app_port || '8000';
         document.getElementById('setting-app-tagline').value = data.app_tagline || 'Self-Hosted CAPTCHA Service';
 
         updateLivePreviews();
@@ -295,13 +294,11 @@ Content-Type: application/json
 
       const app_name = document.getElementById('setting-app-name').value.trim();
       const app_url = document.getElementById('setting-app-url').value.trim();
-      const app_port = document.getElementById('setting-app-port').value.trim();
       const app_tagline = document.getElementById('setting-app-tagline').value.trim();
 
       const payload = {
         app_name,
         app_url,
-        app_port,
         app_tagline
       };
 
