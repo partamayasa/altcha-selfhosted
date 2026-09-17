@@ -42,7 +42,7 @@ const SentinelLogs = {
   async refresh() {
     const tableBody = document.getElementById('logs-table-body');
     if (tableBody) {
-      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);">Loading audit logs...</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);">Loading audit logs</td></tr>`;
     }
 
     try {

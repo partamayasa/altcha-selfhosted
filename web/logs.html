@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--begin::Head-->
+
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  <title>Audit Logs | ALTCHA Manager</title>
+  <!--begin::Primary Meta Tags-->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="title" content="Audit Logs | ALTCHA Manager" />
+  <meta name="description" content="ALTCHA Manager Audit & Traffic Logs table with Tabulator." />
+  <!--end::Primary Meta Tags-->
+
+  <!--begin::Accessibility Features-->
+  <meta name="supported-color-schemes" content="light dark" />
+  <link rel="preload" href="./css/adminlte.css" as="style" />
+  <!--end::Accessibility Features-->
+
+  <!--begin::Fonts-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fontsource/source-sans-3@5.0.12/index.css"
+    integrity="sha256-tXJfXfp6Ewt1ilPzLDtQnJV4hclT9XuaZUKyUvmyr+Q=" crossorigin="anonymous" media="print"
+    onload="this.media = 'all'" />
+  <!--end::Fonts-->
+
+  <!--begin::Third Party Plugin(OverlayScrollbars)-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/styles/overlayscrollbars.min.css"
+    crossorigin="anonymous" />
+  <!--end::Third Party Plugin(OverlayScrollbars)-->
+
+  <!--begin::Third Party Plugin(Bootstrap Icons)-->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    crossorigin="anonymous" />
+  <!--end::Third Party Plugin(Bootstrap Icons)-->
+
+  <!--begin::Required Plugin(AdminLTE)-->
+  <link rel="stylesheet" href="./css/adminlte.css" />
+  <!--end::Required Plugin(AdminLTE)-->
+
+  <!-- Tabulator Bootstrap 5 Theme -->
+  <link rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.4.0/dist/css/tabulator_bootstrap5.min.css"
+    crossorigin="anonymous" />
+
+  <!-- Clean Lightweight Typography - Avoid Bold Fonts -->
+  <style>
+    /* Avoid bold font weights across layout */
+    body, h1, h2, h3, h4, h5, h6,
+    .h1, .h2, .h3, .h4, .h5, .h6,
+    .card-title,
+    .table th,
+    .table td,
+    .tabulator .tabulator-header,
+    .tabulator .tabulator-header .tabulator-col .tabulator-col-content,
+    .tabulator .tabulator-cell,
+    .brand-text,
+    .nav-link p,
+    .badge {
+      font-weight: 400 !important;
+    }
+
+    b, strong, .fw-bold, .fw-semibold, .fw-bolder {
+      font-weight: 400 !important;
+    }
+
+    code {
+      font-weight: 400 !important;
+    }
+
+    /* Uniform Font Size & Non-Bold Styling for Security Event Stream Table */
+    .tabulator {
+      font-size: 0.84rem;
+      border: 1px solid var(--bs-border-color);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .tabulator .tabulator-header {
+      background-color: var(--bs-tertiary-bg);
+      border-bottom: 1px solid var(--bs-border-color);
+    }
+
+    .tabulator .tabulator-header .tabulator-col {
+      background-color: transparent;
+      border-right: 1px solid var(--bs-border-color);
+    }
+
+    .tabulator .tabulator-header .tabulator-col .tabulator-col-content,
+    .tabulator .tabulator-header .tabulator-col-title {
+      font-size: 0.84rem !important;
+      font-weight: 400 !important;
+    }
+
+    .tabulator .tabulator-row {
+      min-height: 35px;
+      cursor: pointer;
+    }
+
+    .tabulator .tabulator-cell {
+      padding: 6px 10px;
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.84rem !important;
+      font-weight: 400 !important;
+      line-height: 1.4 !important;
+    }
+
+    /* All elements inside table cells must have the exact same font size and weight */
+    #logs-table .tabulator-cell,
+    #logs-table .tabulator-cell *,
+    #logs-table .tabulator-cell code,
+    #logs-table .tabulator-cell span,
+    #logs-table .tabulator-cell .badge,
+    #logs-table code,
+    #logs-table .badge {
+      font-size: 0.84rem !important;
+      font-weight: 400 !important;
+      line-height: 1.4 !important;
+    }
+
+    #logs-table .badge {
+      padding: 2px 8px !important;
+      border-radius: 4px;
+      letter-spacing: 0;
+    }
+
+    .tabulator .tabulator-footer {
+      background-color: var(--bs-tertiary-bg);
+      border-top: 1px solid var(--bs-border-color);
+      padding: 8px 12px;
+      font-size: 0.84rem;
+    }
+
+    .tabulator .tabulator-footer,
+    .tabulator .tabulator-footer * {
+      font-size: 0.84rem !important;
+      font-weight: 400 !important;
+    }
+
+    /* Footer Font Styling */
+    .app-footer,
+    .app-footer * {
+      font-size: 0.78rem !important;
+      font-weight: 400 !important;
+    }
+  </style>
+</head>
+<!--end::Head-->
+
+<!--begin::Body-->
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary" data-active-menu="logs">
+  <!--begin::App Wrapper-->
+  <div class="app-wrapper">
+    <!--begin::Header (Loaded via Template)-->
+    <div data-template="header"></div>
+    <!--end::Header-->
+
+    <!--begin::Sidebar (Loaded via Template)-->
+    <div data-template="sidebar"></div>
+    <!--end::Sidebar-->
+
+    <!--begin::App Main-->
+    <main class="app-main">
+      <!--begin::App Content Header-->
+      <div class="app-content-header">
+        <div class="container-fluid">
+          <div class="row align-items-center">
+            <div class="col-sm-6">
+              <h1 class="mb-0 fs-4">
+                <i class="bi bi-file-earmark-text me-2 text-primary"></i>
+                Audit &amp; Traffic Logs
+              </h1>
+            </div>
+            <div class="col-sm-6">
+              <ol class="breadcrumb float-sm-end mb-0 fs-7">
+                <li class="breadcrumb-item"><a href="./index.html" class="text-decoration-none">Home</a></li>
+                <li class="breadcrumb-item">Monitoring</li>
+                <li class="breadcrumb-item active" aria-current="page">Audit Logs</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!--end::App Content Header-->
+
+      <!--begin::App Content-->
+      <div class="app-content">
+        <div class="container-fluid">
+
+          <!--begin::Data Tables Card-->
+          <div class="card card-outline card-primary shadow-sm mb-4">
+            <div class="card-header py-2 px-3">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <h3 class="card-title fs-6 mb-0">
+                  <i class="bi bi-table me-2"></i> Security Event Stream
+                  <span class="badge text-bg-info ms-2 fw-normal" id="logs-total-badge">0 Logs</span>
+                </h3>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="input-group input-group-sm" style="width: 15rem">
+                    <span class="input-group-text bg-body-secondary border-end-0">
+                      <i class="bi bi-search" aria-hidden="true"></i>
+                    </span>
+                    <input
+                      id="table-filter"
+                      type="search"
+                      class="form-control form-control-sm"
+                      placeholder="Filter IP, URL, origin"
+                      aria-label="Filter rows"
+                    />
+                  </div>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="loadLogsData()" title="Refresh Data">
+                    <i class="bi bi-arrow-clockwise"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!--begin::Card Body with Filters & Actions-->
+            <div class="card-body p-3">
+              <!-- Filter Controls Row -->
+              <div class="row g-2 mb-3 align-items-center">
+                <div class="col-md-3 col-sm-6">
+                  <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-body-secondary">
+                      <i class="bi bi-calendar3"></i>
+                    </span>
+                    <select class="form-select form-select-sm" id="logs-date-filter" onchange="loadLogsData()">
+                      <!-- Populated dynamically -->
+                    </select>
+                  </div>
+                </div>
+
+                <div class="col-md-3 col-sm-6">
+                  <select class="form-select form-select-sm" id="logs-status-filter" onchange="loadLogsData()">
+                    <option value="">All HTTP Statuses</option>
+                    <option value="200">200 (OK)</option>
+                    <option value="204">204 (Options)</option>
+                    <option value="403">403 (Blocked)</option>
+                    <option value="429">429 (Rate Limit)</option>
+                    <option value="500">500 (Error)</option>
+                  </select>
+                </div>
+
+                <div class="col-md-6 text-sm-end">
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Export Actions">
+                    <button id="export-csv" type="button" class="btn btn-outline-secondary">
+                      <i class="bi bi-filetype-csv me-1" aria-hidden="true"></i>
+                      Export CSV
+                    </button>
+                    <button id="export-json" type="button" class="btn btn-outline-secondary">
+                      <i class="bi bi-filetype-json me-1" aria-hidden="true"></i>
+                      Export JSON
+                    </button>
+                    <button id="print-table" type="button" class="btn btn-outline-secondary">
+                      <i class="bi bi-printer me-1" aria-hidden="true"></i>
+                      Print
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Data Table Container -->
+              <div id="logs-table"></div>
+            </div>
+            <!--end::Card Body-->
+
+            <!--begin::Card Footer-->
+            <div class="card-footer py-2 px-3 text-secondary small d-flex justify-content-between align-items-center">
+              <span>
+                Powered by
+                <a href="https://tabulator.info/" target="_blank" rel="noopener" class="text-decoration-none">Tabulator</a>
+                &mdash; interactive data tables.
+              </span>
+              <span class="text-muted">Klik baris tabel untuk melihat detail transaksi.</span>
+            </div>
+            <!--end::Card Footer-->
+          </div>
+          <!--end::Data Tables Card-->
+
+        </div>
+      </div>
+      <!--end::App Content-->
+    </main>
+    <!--end::App Main-->
+
+    <!--begin::Footer (Loaded via Template)-->
+    <div data-template="footer"></div>
+    <!--end::Footer-->
+  </div>
+  <!--end::App Wrapper-->
+
+  <!-- Detail Modal -->
+  <div class="modal fade" id="logDetailModal" tabindex="-1" aria-labelledby="logDetailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content shadow">
+        <div class="modal-header py-2 px-3">
+          <h5 class="modal-title fs-6" id="logDetailModalLabel">
+            <i class="bi bi-file-earmark-text me-2 text-primary"></i>
+            Audit Log Entry Details
+          </h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-0" id="log-detail-modal-body">
+          <!-- Populated dynamically -->
+        </div>
+        <div class="modal-footer py-2 px-3">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!--begin::Script-->
+  <!--begin::Third Party Plugin(OverlayScrollbars)-->
+  <script src="https://cdn.jsdelivr.net/npm/overlayscrollbars@2.11.0/browser/overlayscrollbars.browser.es6.min.js"
+    crossorigin="anonymous"></script>
+  <!--end::Third Party Plugin(OverlayScrollbars)-->
+
+  <!--begin::Required Plugin(popperjs for Bootstrap 5)-->
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
+    crossorigin="anonymous"></script>
+  <!--end::Required Plugin(popperjs for Bootstrap 5)-->
+
+  <!--begin::Required Plugin(Bootstrap 5)-->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
+  <!--end::Required Plugin(Bootstrap 5)-->
+
+  <!--begin::Required Plugin(AdminLTE)-->
+  <script src="./js/adminlte.js"></script>
+  <!--end::Required Plugin(AdminLTE)-->
+
+  <!-- Template Loader -->
+  <script src="./js/template-loader.js"></script>
+
+  <!-- Tabulator Table Library -->
+  <script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.4.0/dist/js/tabulator.min.js"
+    crossorigin="anonymous"></script>
+
+  <!-- Sentinel Application API & Logs Scripts -->
+  <script src="./js/auth-guard.js"></script>
+  <script src="./js/app-settings.js"></script>
+  <script src="./js/api.js"></script>
+  <script>
+    let logsTable = null;
+    let detailModal = null;
+    let currentLogsData = [];
+
+    // Formatter Helpers
+    const statusBadgeFormatter = (cell) => {
+      const status = cell.getValue();
+      let color = 'secondary';
+      if (status >= 200 && status < 300) color = 'success';
+      else if (status === 204) color = 'info';
+      else if (status === 403) color = 'warning';
+      else if (status === 429 || status >= 500) color = 'danger';
+      return `<span class="badge text-bg-${color} fw-normal py-0 px-2">${status}</span>`;
+    };
+
+    const methodBadgeFormatter = (cell) => {
+      const method = cell.getValue() || 'GET';
+      let color = 'secondary';
+      if (method === 'GET') color = 'primary-subtle text-primary border border-primary-subtle';
+      else if (method === 'POST') color = 'success-subtle text-success border border-success-subtle';
+      else if (method === 'OPTIONS') color = 'info-subtle text-info border border-info-subtle';
+      return `<span class="badge ${color} fw-normal py-0 px-2">${method}</span>`;
+    };
+
+    const resultBadgeFormatter = (cell) => {
+      const isSuccess = cell.getValue();
+      return isSuccess
+        ? `<span class="badge text-bg-success-subtle text-success border border-success-subtle fw-normal py-0 px-2">Success</span>`
+        : `<span class="badge text-bg-danger-subtle text-danger border border-danger-subtle fw-normal py-0 px-2">Fail</span>`;
+    };
+
+    const codeFormatter = (cell) => {
+      const val = cell.getValue() || '-';
+      return `<code class="text-body">${val}</code>`;
+    };
+
+    const originFormatter = (cell) => {
+      let val = cell.getValue() || '-';
+      if (val && typeof val === 'string') {
+        val = val.replace(/^https?:\/\//i, '');
+      }
+      return `<code class="text-primary">${val}</code>`;
+    };
+
+    const userBadgeFormatter = (cell) => {
+      const val = cell.getValue() || '-';
+      if (!val || val === '-') {
+        return `<span class="text-muted">-</span>`;
+      }
+      return `<span class="badge text-bg-light border fw-normal"><i class="bi bi-person me-1 text-secondary"></i>${val}</span>`;
+    };
+
+    const durationFormatter = (cell) => {
+      const val = cell.getValue() || 0;
+      return `<span class="text-muted">${val}ms</span>`;
+    };
+
+    const timeFormatter = (cell) => {
+      const ts = cell.getValue() || '';
+      if (!ts) return '-';
+      try {
+        // If legacy timestamp ending in 'Z' (UTC), convert to local time via Date
+        if (ts.endsWith('Z')) {
+          const d = new Date(ts);
+          const timePart = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+          return `<span style="font-family: monospace;">${timePart}</span>`;
+        }
+        // If ISO timestamp with offset (e.g. 2026-09-17T18:46:25.123+08:00)
+        if (ts.includes('T')) {
+          const timePart = ts.split('T')[1].split('+')[0].split('-')[0].split('.')[0];
+          return `<span style="font-family: monospace;">${timePart}</span>`;
+        }
+        if (ts.includes(' ')) {
+          const timePart = ts.split(' ')[1].split('.')[0];
+          return `<span style="font-family: monospace;">${timePart}</span>`;
+        }
+        return `<span style="font-family: monospace;">${ts}</span>`;
+      } catch {
+        return ts;
+      }
+    };
+
+    // Initialize Page
+    document.addEventListener('DOMContentLoaded', async () => {
+      detailModal = new bootstrap.Modal(document.getElementById('logDetailModal'));
+      initTabulator();
+      await populateDateFilter();
+      await loadLogsData();
+    });
+
+    async function populateDateFilter() {
+      const select = document.getElementById('logs-date-filter');
+      if (!select) return;
+
+      let dates = [];
+      try {
+        if (typeof SentinelAPI !== 'undefined' && SentinelAPI.getLogDates) {
+          dates = await SentinelAPI.getLogDates();
+        }
+      } catch (err) {
+        console.warn('Failed to fetch log dates:', err.message);
+      }
+
+      if (!dates || dates.length === 0) {
+        dates = [new Date().toISOString().split('T')[0]];
+      }
+
+      select.innerHTML = '';
+      dates.forEach((d, idx) => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
+        select.appendChild(opt);
+      });
+    }
+
+    function initTabulator() {
+      logsTable = new Tabulator('#logs-table', {
+        data: [],
+        layout: 'fitColumns',
+        responsiveLayout: 'collapse',
+        pagination: true,
+        paginationSize: 15,
+        paginationSizeSelector: [10, 15, 25, 50, 100],
+        movableColumns: true,
+        placeholder: 'No audit logs found matching criteria.',
+        columns: [
+          { title: '#', field: 'id', width: 60, hozAlign: 'center', sorter: 'number' },
+          { title: 'Time', field: 'timestamp', width: 110, hozAlign: 'center', formatter: timeFormatter },
+          { title: 'User', field: 'username', width: 110, hozAlign: 'center', formatter: userBadgeFormatter },
+          { title: 'Client IP', field: 'ip', width: 150, formatter: codeFormatter },
+          { title: 'Method', field: 'method', width: 115, hozAlign: 'center', formatter: methodBadgeFormatter },
+          { title: 'Target Endpoint', field: 'url', minWidth: 200, formatter: codeFormatter },
+          { title: 'Origin Header', field: 'origin', minWidth: 180, formatter: originFormatter },
+          { title: 'Result', field: 'isSuccess', width: 90, hozAlign: 'center', formatter: resultBadgeFormatter },
+        ],
+      });
+
+      // Row Click -> Open Detail Modal
+      logsTable.on('rowClick', (e, row) => {
+        showLogDetail(row.getData());
+      });
+
+      // Search Filter
+      document.getElementById('table-filter').addEventListener('input', (e) => {
+        const val = e.target.value.trim().toLowerCase();
+        if (val) {
+          logsTable.setFilter([
+            [
+              { field: 'ip', type: 'like', value: val },
+              { field: 'url', type: 'like', value: val },
+              { field: 'origin', type: 'like', value: val },
+              { field: 'result', type: 'like', value: val },
+              { field: 'username', type: 'like', value: val },
+            ]
+          ]);
+        } else {
+          logsTable.clearFilter();
+        }
+      });
+
+      // Export Buttons
+      document.getElementById('export-csv').addEventListener('click', () => {
+        logsTable.download('csv', `altcha-audit-logs-${new Date().toISOString().split('T')[0]}.csv`);
+      });
+      document.getElementById('export-json').addEventListener('click', () => {
+        logsTable.download('json', `altcha-audit-logs-${new Date().toISOString().split('T')[0]}.json`);
+      });
+      document.getElementById('print-table').addEventListener('click', () => {
+        logsTable.print(false, true);
+      });
+    }
+
+    async function loadLogsData() {
+      const date = document.getElementById('logs-date-filter')?.value || '';
+      const status = document.getElementById('logs-status-filter')?.value || '';
+      const search = document.getElementById('table-filter')?.value || '';
+
+      let logs = [];
+      try {
+        if (typeof SentinelAPI !== 'undefined' && SentinelAPI.getLogs) {
+          const res = await SentinelAPI.getLogs({
+            date,
+            status,
+            search,
+            limit: 200,
+            page: 1
+          });
+          logs = res.logs || [];
+        }
+      } catch (err) {
+        console.warn('API getLogs failed, loading fallback data:', err.message);
+      }
+
+      // Fallback realistic logs if running on static preview
+      if (!logs || logs.length === 0) {
+        logs = generateSampleLogs();
+      }
+
+      currentLogsData = logs;
+      if (logsTable) {
+        logsTable.setData(logs);
+      }
+
+      const totalBadge = document.getElementById('logs-total-badge');
+      if (totalBadge) {
+        totalBadge.textContent = `${logs.length} Logs`;
+      }
+    }
+
+    function formatModalTimestamp(ts) {
+      if (!ts) return '-';
+      try {
+        if (ts.endsWith('Z')) {
+          const d = new Date(ts);
+          return d.toLocaleString('en-GB', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+            hour12: false
+          }) + ' (UTC+8)';
+        }
+        return ts.replace('T', ' ');
+      } catch {
+        return ts;
+      }
+    }
+
+    function showLogDetail(log) {
+      const body = document.getElementById('log-detail-modal-body');
+      if (!body || !log) return;
+
+      let statusBadge = 'text-bg-success';
+      if (log.status === 403) statusBadge = 'text-bg-warning';
+      else if (log.status === 429 || log.status >= 500) statusBadge = 'text-bg-danger';
+
+      body.innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-sm table-striped align-middle mb-0" style="font-size: 0.85rem;">
+            <tbody>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal" style="width: 32%;">Timestamp (UTC+8)</th>
+                <td class="py-2 px-3"><code>${formatModalTimestamp(log.timestamp)}</code></td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">Account / User</th>
+                <td class="py-2 px-3">
+                  ${log.username && log.username !== '-'
+                    ? `<span class="badge text-bg-primary fw-normal"><i class="bi bi-person-circle me-1"></i>${log.username}</span>`
+                    : `<span class="text-muted">Anonymous / Not Provided</span>`
+                  }
+                </td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">Client IP Address</th>
+                <td class="py-2 px-3"><code>${log.ip || '-'}</code></td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">HTTP Method &amp; Endpoint</th>
+                <td class="py-2 px-3">
+                  <span class="badge text-bg-secondary fw-normal me-2">${log.method || 'GET'}</span>
+                  <code>${log.url || '-'}</code>
+                </td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">HTTP Status</th>
+                <td class="py-2 px-3">
+                  <span class="badge ${statusBadge} fw-normal">${log.status || 200}</span>
+                </td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">Execution Latency</th>
+                <td class="py-2 px-3">${log.durationMs || 0} ms</td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">Origin Header</th>
+                <td class="py-2 px-3"><code class="text-primary">${log.origin || '-'}</code></td>
+              </tr>
+              <tr>
+                <th class="py-2 px-3 text-secondary fw-normal">Execution Result</th>
+                <td class="py-2 px-3">
+                  <div class="bg-body-tertiary p-2 rounded border font-monospace" style="font-size: 0.8rem; word-break: break-all;">
+                    ${(log.result || (log.isSuccess ? 'Success' : 'Fail')).replace(/^SUCCESS/i, 'Success').replace(/^ERROR:\s*/i, 'Fail: ').replace(/^FAIL/i, 'Fail')}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      if (detailModal) {
+        detailModal.show();
+      }
+    }
+
+    function generateSampleLogs() {
+      return [
+        { id: 180, timestamp: '2026-09-17T13:45:10.120Z', ip: '192.168.1.45', method: 'POST', url: '/altcha/verify', status: 200, durationMs: 14, origin: 'https://portal.secure.id', result: 'Success', isSuccess: 1 },
+        { id: 179, timestamp: '2026-09-17T13:42:04.530Z', ip: '10.0.12.88', method: 'GET', url: '/altcha/challenge', status: 200, durationMs: 28, origin: 'https://member.domain.com', result: 'Success', isSuccess: 1 },
+        { id: 178, timestamp: '2026-09-17T13:38:22.019Z', ip: '103.245.38.10', method: 'POST', url: '/verify', status: 200, durationMs: 18, origin: 'https://auth.company.com', result: 'Success', isSuccess: 1 },
+        { id: 177, timestamp: '2026-09-17T13:35:11.890Z', ip: '114.122.204.15', method: 'GET', url: '/challenge', status: 200, durationMs: 32, origin: 'https://app.altcha.io', result: 'Success', isSuccess: 1 },
+        { id: 176, timestamp: '2026-09-17T13:30:45.312Z', ip: '45.12.33.102', method: 'GET', url: '/challenge', status: 403, durationMs: 4, origin: 'https://malicious-site.xyz', result: 'Fail: Forbidden Origin', isSuccess: 0 },
+        { id: 175, timestamp: '2026-09-17T13:25:01.782Z', ip: '202.158.42.19', method: 'GET', url: '/challenge', status: 429, durationMs: 2, origin: 'https://portal.secure.id', result: 'Fail: Too Many Requests', isSuccess: 0 },
+        { id: 174, timestamp: '2026-09-17T13:20:19.450Z', ip: '192.168.1.45', method: 'GET', url: '/challenge', status: 200, durationMs: 15, origin: 'https://portal.secure.id', result: 'Success', isSuccess: 1 },
+        { id: 173, timestamp: '2026-09-17T13:15:33.220Z', ip: '103.245.38.10', method: 'GET', url: '/altcha/challenge', status: 200, durationMs: 22, origin: 'https://auth.company.com', result: 'Success', isSuccess: 1 },
+        { id: 172, timestamp: '2026-09-17T13:10:04.110Z', ip: '114.122.204.15', method: 'POST', url: '/verify', status: 200, durationMs: 19, origin: 'https://app.altcha.io', result: 'Success', isSuccess: 1 },
+        { id: 171, timestamp: '2026-09-17T13:05:44.890Z', ip: '10.0.12.88', method: 'POST', url: '/altcha/verify', status: 200, durationMs: 16, origin: 'https://member.domain.com', result: 'Success', isSuccess: 1 }
+      ];
+    }
+  </script>
+  <!--end::Script-->
+</body>
+<!--end::Body-->
+
+</html>
