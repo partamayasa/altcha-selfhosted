@@ -12,9 +12,7 @@ const SentinelSettings = {
     ]);
   },
 
-  // ────────────────────────────────────────────
   // Engine / PoW Config
-  // ────────────────────────────────────────────
 
   async loadConfig() {
     try {
@@ -74,9 +72,7 @@ const SentinelSettings = {
     }
   },
 
-  // ────────────────────────────────────────────
   // App Settings (Name, Tagline, Footer)
-  // ────────────────────────────────────────────
 
   async loadAppSettings() {
     try {

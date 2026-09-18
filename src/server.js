@@ -147,7 +147,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── Cookie parser (lightweight, no extra dep needed) ──────────────────────────
+// Cookie parser (lightweight, no extra dep needed)
 function parseCookies(cookieHeader) {
   const cookies = {};
   if (!cookieHeader) return cookies;
@@ -158,10 +158,10 @@ function parseCookies(cookieHeader) {
   return cookies;
 }
 
-// ── Session TTL (hours) ───────────────────────────────────────────────────────
+// Session TTL (hours)
 const SESSION_TTL_HOURS = parseInt(process.env.SESSION_TTL_HOURS, 10) || 8;
 
-// ── Auth helper: get session user from request ────────────────────────────────
+// Auth helper: get session user from request
 function getSessionUser(req) {
   const cookies = parseCookies(req.headers.cookie);
   const token = cookies['sentinel_session'];
@@ -169,7 +169,7 @@ function getSessionUser(req) {
   return SentinelDB.getSession(token);
 }
 
-// ── requireAuth middleware ────────────────────────────────────────────────────
+// requireAuth middleware
 const requireAuth = (req, res, next) => {
   const user = getSessionUser(req);
   if (!user) {
@@ -183,7 +183,7 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
-// ── requireAdmin middleware ───────────────────────────────────────────────────
+// requireAdmin middleware
 const requireAdmin = (req, res, next) => {
   if (!req.authUser) {
     return res.status(401).json({ error: 'Unauthorized. Please log in.' });
@@ -194,7 +194,7 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// ── Helper: parse allowed_origins JSON string from user record ───────────────
+// Helper: parse allowed_origins JSON string from user record
 function parseAllowedOrigins(user) {
   if (!user || !user.allowed_origins) return null;
   try {
@@ -205,7 +205,7 @@ function parseAllowedOrigins(user) {
   }
 }
 
-// ── Helper: Match incoming request origin against a whitelist rule ───────────
+// Helper: Match incoming request origin against a whitelist rule
 function matchAllowedOriginRule(requestOrigin, rule) {
   if (!requestOrigin || !rule) return false;
   const r = rule.trim();
@@ -250,7 +250,7 @@ function matchAllowedOriginRule(requestOrigin, rule) {
   return false;
 }
 
-// ── requireApiKey middleware for ALTCHA endpoints ────────────────────────────
+// requireApiKey middleware for ALTCHA endpoints
 const requireApiKey = (req, res, next) => {
   let apiKey = null;
 
@@ -308,7 +308,7 @@ const requireApiKey = (req, res, next) => {
     });
   }
 
-  // ── Strict Domain Whitelist (Origin Binding) ───────────────────────────────
+  // Strict Domain Whitelist (Origin Binding)
   // Manager UI sessions are exempt from origin binding checks
   const sessionUser = getSessionUser(req);
   const isManagerRequest = !!sessionUser;
@@ -519,7 +519,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Auth Routes ──────────────────────────────────────────────────────────────
+// Auth Routes
 
 /**
  * GET /api/auth/challenge
@@ -539,7 +539,7 @@ app.post('/api/auth/login', async (req, res) => {
     return res.status(400).json({ error: 'Username and password are required.' });
   }
 
-  // ── Verify ALTCHA CAPTCHA payload ───────────────────────────
+  // Verify ALTCHA CAPTCHA payload
   if (!altcha) {
     return res.status(400).json({ error: 'CAPTCHA verification is required. Please complete the CAPTCHA.' });
   }
@@ -658,7 +658,7 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
+
 
 // Sentinel Management APIs
 app.get('/api/sentinel/stats', requireAuth, (req, res) => {
@@ -809,7 +809,7 @@ app.post('/api/sentinel/app-settings', requireAuth, requireAdmin, (req, res) => 
   res.json({ success: true, settings: SentinelDB.getSettings() });
 });
 
-// ── User Management APIs (Administrator only) ─────────────────────────────────
+// User Management APIs (Administrator only)
 
 // GET /api/sentinel/users — List all users
 app.get('/api/sentinel/users', requireAuth, requireAdmin, (req, res) => {
@@ -1034,7 +1034,7 @@ app.post('/api/sentinel/keys/regenerate-my-key', requireAuth, (req, res) => {
   }
 });
 
-// ── Redirect root to login, keys, or dashboard based on session ───────────────
+// Redirect root to login, keys, or dashboard based on session
 app.get('/', (req, res) => {
   const user = getSessionUser(req);
   if (user) {
@@ -1046,7 +1046,7 @@ app.get('/', (req, res) => {
   return res.redirect('/login');
 });
 
-// ── Auth guard for protected HTML pages ──────────────────────────────────────
+// Auth guard for protected HTML pages
 const PROTECTED_PAGES = new Set([
   '/',
   '/index',

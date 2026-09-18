@@ -142,8 +142,8 @@ function seedDefaultSettings() {
   const seedSettings = [
     ['app_name', 'ALTCHA Manager'],
     ['app_tagline', 'Self-Hosted CAPTCHA Service'],
-    ['app_url', 'http://localhost:8000'],
-    ['app_port', '8000'],
+    ['app_url', 'http://localhost:3000'],
+    ['app_port', '3000'],
     ['app_footer', 'Copyright \u00a9 2026 ALTCHA Manager. All rights reserved.']
   ];
   const seedStmt = db.prepare(
@@ -173,16 +173,7 @@ function seedDefaultAdmin() {
       `INSERT INTO users (username, full_name, password_hash, role, api_key, allowed_origins, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(adminUsername, adminFullName, defaultHash, 'administrator', defaultKey, defaultOrigins, now, now);
 
-    console.log('======================================================================');
-    console.log('[ALTCHA Database] Database populated & Administrator account created!');
-    console.log('----------------------------------------------------------------------');
-    console.log(`  Username : ${adminUsername}`);
-    console.log(`  Password : ${adminPassword}`);
-    console.log(`  Role     : administrator`);
-    console.log(`  API Key  : ${defaultKey}`);
-    console.log(`  Origins  : Wildcard (*)`);
-    console.log('  NOTE: Please change this default password after logging in.');
-    console.log('======================================================================');
+    console.log(`[Database] Initial administrator created: ${adminUsername} | API Key: ${defaultKey}`);
   } else {
     // Ensure administrator has administrator role, an api_key, and full_name
     const updates = [];
@@ -607,9 +598,7 @@ export const SentinelDB = {
     }
   },
 
-  // ──────────────────────────────────────────
   // Auth & User Management
-  // ──────────────────────────────────────────
 
   generateApiKey() {
     return 'altcha_key_' + crypto.randomBytes(16).toString('hex');
@@ -804,9 +793,7 @@ export const SentinelDB = {
     }
   },
 
-  // ──────────────────────────────────────────
   // Auth — Sessions
-  // ──────────────────────────────────────────
 
   /**
    * Create a new session token for a user

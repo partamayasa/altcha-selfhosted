@@ -1,7 +1,4 @@
-/* ==========================================================================
-   ALTCHA SENTINEL - AdminLTE 3 Custom Integrations & App Polish
-   Works alongside official ColorlibHQ/AdminLTE dist/css/adminlte.min.css
-   ========================================================================== */
+/* ALTCHA Sentinel Custom CSS */
 
 /* Source Sans Pro - Official AdminLTE Font */
 @font-face {
@@ -157,9 +154,7 @@ code, kbd, pre, samp, .font-mono {
   margin-left: auto !important;
 }
 
-/* ==========================================================================
-   AdminLTE Mini-Sidebar (Collapsed Mode) & Hover Expansion
-   ========================================================================== */
+/* AdminLTE Mini-Sidebar (Collapsed Mode) & Hover Expansion */
 
 /* Main Header, Content Wrapper, and Footer Margin-Left */
 @media (min-width: 768px) {
