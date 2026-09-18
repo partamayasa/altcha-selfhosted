@@ -514,19 +514,41 @@ Content-Type: application/json
 
     // Render domain badges for a user row
     function renderDomainBadges(userId, originsJson) {
-      if (!originsJson) {
-        return `<span class="text-muted small">All origins</span>`;
-      }
       let origins = [];
-      try { origins = JSON.parse(originsJson); } catch { return `<span class="text-muted small">Invalid</span>`; }
-      if (!origins.length) return `<span class="text-muted small">All origins</span>`;
+      try {
+        if (typeof originsJson === 'string') {
+          origins = JSON.parse(originsJson);
+        } else if (Array.isArray(originsJson)) {
+          origins = originsJson;
+        }
+      } catch {
+        origins = [];
+      }
+
+      if (!origins || origins.length === 0) {
+        return `<span class="badge text-bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;">
+          <i class="bi bi-shield-slash me-1"></i>None (Block All)
+        </span>`;
+      }
+
+      if (origins.includes('*')) {
+        return `<span class="badge text-bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;">
+          <i class="bi bi-globe me-1"></i>Wildcard (*)
+        </span>`;
+      }
+
       const MAX_SHOW = 2;
       const shown = origins.slice(0, MAX_SHOW);
       const extra = origins.length - MAX_SHOW;
       let html = shown.map(o =>
-        `<span class="badge text-bg-info-subtle text-info border border-info-subtle" style="font-size:0.72rem;font-weight:400;white-space:normal;word-break:break-all;">${escapeHtml(o)}</span>`
-      ).join('');
-      if (extra > 0) html += ` <span class="text-muted small">+${extra} more</span>`;
+        `<span class="badge text-bg-info-subtle text-info border border-info-subtle px-2 py-1" style="font-size:0.72rem;font-weight:400;white-space:normal;word-break:break-all;">
+          <i class="bi bi-shield-check me-1"></i>${escapeHtml(o)}
+        </span>`
+      ).join(' ');
+
+      if (extra > 0) {
+        html += ` <span class="badge text-bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1" style="font-size:0.72rem;font-weight:400;" title="${escapeHtml(origins.join('\n'))}">+${extra} more</span>`;
+      }
       return html;
     }
 
