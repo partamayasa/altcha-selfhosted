@@ -758,6 +758,16 @@ app.post('/api/sentinel/redis/flush', requireAuth, async (req, res) => {
 app.get('/api/sentinel/app-settings', (req, res) => {
   try {
     const settings = SentinelDB.getSettings();
+    try {
+      const pkgPath = path.join(process.cwd(), 'package.json');
+      const pkgStr = fs.readFileSync(pkgPath, 'utf8');
+      const pkg = JSON.parse(pkgStr);
+      settings.app_version = pkg.version || '1.0.0';
+      settings.altcha_lib_version = (pkg.dependencies && pkg.dependencies['altcha-lib']) ? pkg.dependencies['altcha-lib'].replace(/^[^\d]+/, '') : '2.5.0';
+    } catch (e) {
+      settings.app_version = '1.0.0';
+      settings.altcha_lib_version = '2.5.0';
+    }
     res.json(settings);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch app settings: ' + err.message });
@@ -808,6 +818,50 @@ app.post('/api/sentinel/app-settings', requireAuth, requireAdmin, (req, res) => 
   }
 
   res.json({ success: true, settings: SentinelDB.getSettings() });
+});
+
+// Update PoW Engine Config (.env)
+app.post('/api/sentinel/pow-config', requireAuth, requireAdmin, (req, res) => {
+  const { altcha_cost, expires_in, rate_limit_max, rate_limit_window_ms } = req.body;
+
+  if (altcha_cost === undefined && expires_in === undefined && rate_limit_max === undefined && rate_limit_window_ms === undefined) {
+    return res.status(400).json({ error: 'No configuration provided.' });
+  }
+
+  let envContent = '';
+  if (fs.existsSync(PATHS.envFile)) {
+    try {
+      envContent = fs.readFileSync(PATHS.envFile, 'utf8');
+    } catch (e) {
+      return res.status(500).json({ error: 'Could not read .env file: ' + e.message });
+    }
+  }
+
+  const updateEnv = (key, val) => {
+    if (val !== undefined && val !== '') {
+      const regex = new RegExp(`^${key}=.*`, 'm');
+      if (regex.test(envContent)) {
+        envContent = envContent.replace(regex, `${key}=${val}`);
+      } else {
+        envContent += `\n${key}=${val}`;
+      }
+    }
+  };
+
+  updateEnv('ALTCHA_COST', altcha_cost);
+  updateEnv('EXPIRES_IN', expires_in);
+  updateEnv('RATE_LIMIT_MAX', rate_limit_max);
+  updateEnv('RATE_LIMIT_WINDOW_MS', rate_limit_window_ms);
+
+  try {
+    fs.writeFileSync(PATHS.envFile, envContent.trim() + '\n', 'utf8');
+    console.log('[pow-config] .env updated successfully');
+  } catch (err) {
+    console.error('[pow-config] Failed to write .env:', err.message);
+    return res.status(500).json({ error: 'Could not save .env file: ' + err.message });
+  }
+
+  res.json({ success: true, message: 'Engine configuration updated successfully.' });
 });
 
 // User Management APIs (Administrator only)

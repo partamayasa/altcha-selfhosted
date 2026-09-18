@@ -43,6 +43,18 @@ const SentinelSettings = {
       redisBtn.disabled = !this.config.redisConnected;
     }
 
+    const inputCost = document.getElementById('input-cost');
+    if (inputCost) inputCost.value = this.config.cost;
+
+    const inputExpires = document.getElementById('input-expires');
+    if (inputExpires) inputExpires.value = this.config.expiresIn;
+
+    const inputRateMax = document.getElementById('input-ratelimit-max');
+    if (inputRateMax) inputRateMax.value = this.config.rateLimitMax;
+
+    const inputRateWindow = document.getElementById('input-ratelimit-window');
+    if (inputRateWindow) inputRateWindow.value = this.config.rateLimitWindowMs;
+
     this.calculateEstimate();
   },
 

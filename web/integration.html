@@ -79,11 +79,11 @@
     .code-box {
       background-color: var(--bs-tertiary-bg);
       border: 1px solid var(--bs-border-color);
-      border-radius: 6px;
-      padding: 10px 14px;
+      border-radius: 8px;
+      padding: 12px 16px;
       position: relative;
       overflow-x: auto;
-      font-size: 0.84rem;
+      font-size: 0.85rem;
     }
 
     .code-box pre {
@@ -91,7 +91,7 @@
       font-family: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       font-size: 0.84rem !important;
       font-weight: 400 !important;
-      line-height: 1.5;
+      line-height: 1.6;
       color: var(--bs-body-color);
       white-space: pre-wrap;
       word-break: break-all;
@@ -255,20 +255,20 @@
                   <!-- Section 1: Challenge -->
                   <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                      <label class="form-label text-secondary small mb-0">PoW Challenge (/challenge):</label>
+                      <span class="text-body small fw-medium">PoW Challenge (/challenge):</span>
                       <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.8rem;"
                         onclick="SentinelIntegration.testManualChallenge()">
                         <i class="bi bi-download me-1"></i> Request Challenge
                       </button>
                     </div>
-                    <div class="code-box" style="max-height: 110px;">
+                    <div class="code-box p-2" style="max-height: 110px;">
                       <pre id="manual-challenge-output">Click the button above to test raw challenge response</pre>
                     </div>
                   </div>
 
                   <!-- Section 2: Verify -->
                   <div>
-                    <label class="form-label text-secondary small mb-1">Verify Raw Payload (/verify):</label>
+                    <span class="text-body small fw-medium mb-1 d-block">Verify Raw Payload (/verify):</span>
                     <div class="input-group input-group-sm mb-2">
                       <input type="text" class="form-control font-monospace" id="manual-verify-input"
                         placeholder="Paste base64 payload here" style="font-size: 0.84rem;" />
@@ -276,7 +276,7 @@
                         <i class="bi bi-check-lg me-1"></i> Verify
                       </button>
                     </div>
-                    <div class="code-box" style="max-height: 110px;">
+                    <div class="code-box p-2" style="max-height: 110px;">
                       <pre id="manual-verify-output">Verification output will appear here</pre>
                     </div>
                   </div>
@@ -305,7 +305,7 @@
                   <!-- Snippet 1: Frontend HTML Form -->
                   <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="text-body fw-normal" style="font-size: 0.88rem;">
+                      <span class="text-body small fw-medium">
                         <i class="bi bi-filetype-html text-danger me-1"></i> 1. Frontend HTML Form
                       </span>
                       <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.8rem;"
@@ -313,7 +313,7 @@
                         <i class="bi bi-clipboard me-1"></i> Copy
                       </button>
                     </div>
-                    <div class="code-box">
+                    <div class="code-box p-2">
                       <pre id="code-snippet-html"></pre>
                     </div>
                   </div>
@@ -321,7 +321,7 @@
                   <!-- Snippet 2: Backend Node.js -->
                   <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="text-body fw-normal" style="font-size: 0.88rem;">
+                      <span class="text-body small fw-medium">
                         <i class="bi bi-filetype-js text-warning me-1"></i> 2. Backend Node.js (Express)
                       </span>
                       <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.8rem;"
@@ -329,7 +329,7 @@
                         <i class="bi bi-clipboard me-1"></i> Copy
                       </button>
                     </div>
-                    <div class="code-box">
+                    <div class="code-box p-2">
                       <pre id="code-snippet-node"></pre>
                     </div>
                   </div>
@@ -337,7 +337,7 @@
                   <!-- Snippet 3: Backend PHP -->
                   <div class="mb-3">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="text-body fw-normal" style="font-size: 0.88rem;">
+                      <span class="text-body small fw-medium">
                         <i class="bi bi-filetype-php text-primary me-1"></i> 3. Backend PHP
                       </span>
                       <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.8rem;"
@@ -345,7 +345,7 @@
                         <i class="bi bi-clipboard me-1"></i> Copy
                       </button>
                     </div>
-                    <div class="code-box">
+                    <div class="code-box p-2">
                       <pre id="code-snippet-php"></pre>
                     </div>
                   </div>
@@ -353,7 +353,7 @@
                   <!-- Snippet 4: cURL CLI -->
                   <div>
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                      <span class="text-body fw-normal" style="font-size: 0.88rem;">
+                      <span class="text-body small fw-medium">
                         <i class="bi bi-terminal text-success me-1"></i> 4. cURL CLI
                       </span>
                       <button class="btn btn-outline-secondary btn-sm py-0 px-2" style="font-size: 0.8rem;"
@@ -361,7 +361,7 @@
                         <i class="bi bi-clipboard me-1"></i> Copy
                       </button>
                     </div>
-                    <div class="code-box">
+                    <div class="code-box p-2">
                       <pre id="code-snippet-curl"></pre>
                     </div>
                   </div>
