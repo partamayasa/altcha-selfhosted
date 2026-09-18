@@ -235,9 +235,18 @@
                     <span class="input-group-text bg-body-secondary">
                       <i class="bi bi-calendar3"></i>
                     </span>
-                    <select class="form-select form-select-sm" id="logs-date-filter" onchange="loadLogsData()">
-                      <!-- Populated dynamically -->
+                    <select class="form-select form-select-sm" id="logs-date-filter" onchange="onLogsDateFilterChange()">
+                      <option value="all">All time</option>
+                      <option value="1d">1 day</option>
+                      <option value="1w">1 week</option>
+                      <option value="1m">1 month</option>
+                      <option value="custom">Range date</option>
                     </select>
+                  </div>
+                  <div class="input-group input-group-sm mt-1 d-none" id="logs-date-range">
+                    <input type="date" class="form-control form-control-sm" id="logs-date-from" onchange="loadLogsData()" title="From date">
+                    <span class="input-group-text bg-body-secondary">to</span>
+                    <input type="date" class="form-control form-control-sm" id="logs-date-to" onchange="loadLogsData()" title="To date">
                   </div>
                 </div>
 
@@ -269,7 +278,7 @@
                   </div>
                   <button id="open-delete-logs-btn" type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteLogsModal">
                     <i class="bi bi-trash3 me-1" aria-hidden="true"></i>
-                    Hapus Log
+                    Delete Logs
                   </button>
                 </div>
               </div>
@@ -286,7 +295,7 @@
                 <a href="https://tabulator.info/" target="_blank" rel="noopener" class="text-decoration-none">Tabulator</a>
                 &mdash; interactive data tables.
               </span>
-              <span class="text-muted">Klik baris tabel untuk melihat detail transaksi.</span>
+              <span class="text-muted">Click a table row to view transaction details.</span>
             </div>
             <!--end::Card Footer-->
           </div>
@@ -332,35 +341,35 @@
         <div class="modal-header py-2 px-3 bg-danger-subtle text-danger-emphasis">
           <h5 class="modal-title fs-6 fw-bold" id="deleteLogsModalLabel">
             <i class="bi bi-trash3 me-2"></i>
-            Hapus Data Audit &amp; Traffic Logs
+            Delete Audit &amp; Traffic Logs
           </h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body p-3">
           <div class="alert alert-danger d-flex align-items-center py-2 px-3 mb-3 small" role="alert">
             <i class="bi bi-exclamation-triangle-fill flex-shrink-0 me-2 fs-5"></i>
-            <div>Data log yang dihapus akan dibersihkan dari database secara <strong>permanen</strong> dan tidak dapat dipulihkan.</div>
+            <div>Deleted log data will be removed from the database <strong>permanently</strong> and cannot be recovered.</div>
           </div>
 
           <div class="mb-3">
             <label for="delete-range-select" class="form-label fw-semibold small text-secondary">
-              Pilih Rentang / Satuan Waktu:
+              Select Range / Time Period:
             </label>
             <select class="form-select form-select-sm" id="delete-range-select">
-              <option value="all">Keseluruhan Waktu (Hapus Semua Log)</option>
-              <option value="date">Per Tanggal Tertentu (Spesifik)</option>
-              <option value="older_than_24h">Lebih dari 24 Jam yang Lalu</option>
-              <option value="older_than_7d">Lebih dari 7 Hari yang Lalu</option>
-              <option value="older_than_30d">Lebih dari 30 Hari yang Lalu</option>
-              <option value="older_than_90d">Lebih dari 90 Hari yang Lalu</option>
-              <option value="before_date">Sebelum Tanggal Tertentu</option>
+              <option value="all">All Time (Delete All Logs)</option>
+              <option value="date">Specific Date</option>
+              <option value="older_than_24h">Older than 24 Hours</option>
+              <option value="older_than_7d">Older than 7 Days</option>
+              <option value="older_than_30d">Older than 30 Days</option>
+              <option value="older_than_90d">Older than 90 Days</option>
+              <option value="before_date">Before a Specific Date</option>
             </select>
           </div>
 
           <!-- Specific Date Container (Shown when range = 'date') -->
           <div class="mb-3 d-none" id="delete-date-container">
             <label for="delete-specific-date" class="form-label fw-semibold small text-secondary">
-              Pilih Tanggal Log:
+              Select Log Date:
             </label>
             <select class="form-select form-select-sm" id="delete-specific-date">
               <!-- Populated dynamically -->
@@ -370,21 +379,21 @@
           <!-- Before Date Container (Shown when range = 'before_date') -->
           <div class="mb-3 d-none" id="delete-before-container">
             <label for="delete-before-date" class="form-label fw-semibold small text-secondary">
-              Hapus Log Sebelum Tanggal:
+              Delete Logs Before Date:
             </label>
             <input type="date" class="form-control form-control-sm" id="delete-before-date">
           </div>
 
           <!-- Dynamic Summary / Notice -->
           <div class="p-2 rounded bg-body-tertiary border small text-muted" id="delete-summary-text">
-            <i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>seluruh data log</strong> pada database.
+            <i class="bi bi-info-circle me-1"></i> This action will delete <strong>all log data</strong> in the database.
           </div>
         </div>
         <div class="modal-footer py-2 px-3">
-          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Batal</button>
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="button" class="btn btn-sm btn-danger" id="btn-confirm-delete-logs">
             <i class="bi bi-trash3 me-1"></i>
-            <span id="btn-delete-text">Hapus Sekarang</span>
+            <span id="btn-delete-text">Delete Now</span>
           </button>
         </div>
       </div>
@@ -534,9 +543,10 @@
     });
 
     async function populateDateFilter() {
-      const select = document.getElementById('logs-date-filter');
       const deleteSelect = document.getElementById('delete-specific-date');
-      if (!select) return;
+      const select = document.getElementById('logs-date-filter');
+
+      if (select && !select.value) select.value = 'all';
 
       let dates = [];
       try {
@@ -545,26 +555,6 @@
         }
       } catch (err) {
         console.warn('Failed to fetch log dates:', err.message);
-      }
-
-      select.innerHTML = '';
-
-      // Option: All Dates
-      const allOpt = document.createElement('option');
-      allOpt.value = 'all';
-      allOpt.textContent = 'Semua Tanggal (All Dates)';
-      select.appendChild(allOpt);
-
-      if (dates && dates.length > 0) {
-        dates.forEach((d, idx) => {
-          const opt = document.createElement('option');
-          opt.value = d;
-          opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
-          if (idx === 0) opt.selected = true; // Default to latest date
-          select.appendChild(opt);
-        });
-      } else {
-        allOpt.selected = true;
       }
 
       // Populate delete modal specific date select
@@ -580,10 +570,36 @@
         } else {
           const opt = document.createElement('option');
           opt.value = '';
-          opt.textContent = 'Tidak ada tanggal log yang tersedia';
+          opt.textContent = 'No log dates available';
           deleteSelect.appendChild(opt);
         }
       }
+
+      // Reveal the custom date-range inputs only when "Range date" is selected.
+      // (The DOMContentLoaded handler calls loadLogsData() right after this.)
+      if (select && document.getElementById('logs-date-range')) {
+        document.getElementById('logs-date-range').classList.toggle('d-none', select.value !== 'custom');
+      }
+    }
+
+    function onLogsDateFilterChange() {
+      const select = document.getElementById('logs-date-filter');
+      const rangeWrap = document.getElementById('logs-date-range');
+      if (select && rangeWrap) {
+        rangeWrap.classList.toggle('d-none', select.value !== 'custom');
+      }
+      loadLogsData();
+    }
+
+    function getLogsDateFilterParams() {
+      const select = document.getElementById('logs-date-filter');
+      const range = select ? select.value : 'all';
+      const params = { range };
+      if (range === 'custom') {
+        params.from = document.getElementById('logs-date-from')?.value || '';
+        params.to = document.getElementById('logs-date-to')?.value || '';
+      }
+      return params;
     }
 
     function initDeleteLogsModal() {
@@ -609,32 +625,32 @@
         if (val === 'date') {
           dateContainer?.classList.remove('d-none');
           beforeContainer?.classList.add('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>seluruh data log pada tanggal yang dipilih</strong>.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete <strong>all log data on the selected date</strong>.';
         } else if (val === 'before_date') {
           dateContainer?.classList.add('d-none');
           beforeContainer?.classList.remove('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>semua data log sebelum tanggal yang ditentukan</strong>.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete <strong>all log data before the specified date</strong>.';
         } else if (val === 'older_than_24h') {
           dateContainer?.classList.add('d-none');
           beforeContainer?.classList.add('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 24 jam yang lalu</strong>.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete log data <strong>older than 24 hours</strong>.';
         } else if (val === 'older_than_7d') {
           dateContainer?.classList.add('d-none');
           beforeContainer?.classList.add('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 7 hari yang lalu</strong>.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete log data <strong>older than 7 days</strong>.';
         } else if (val === 'older_than_30d') {
           dateContainer?.classList.add('d-none');
           beforeContainer?.classList.add('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 30 hari yang lalu</strong>.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete log data <strong>older than 30 days</strong>.';
         } else if (val === 'older_than_90d') {
           dateContainer?.classList.add('d-none');
           beforeContainer?.classList.add('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus data log yang <strong>lebih tua dari 90 hari yang lalu</strong>.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete log data <strong>older than 90 days</strong>.';
         } else {
           // 'all'
           dateContainer?.classList.add('d-none');
           beforeContainer?.classList.add('d-none');
-          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> Aksi ini akan menghapus <strong>seluruh data log</strong> pada database dari awal hingga sekarang.';
+          summaryText.innerHTML = '<i class="bi bi-info-circle me-1"></i> This action will delete <strong>all log data</strong> in the database from the beginning to now.';
         }
       });
 
@@ -644,28 +660,28 @@
         const beforeDate = document.getElementById('delete-before-date')?.value || '';
 
         if (range === 'date' && !date) {
-          showToast('Silakan pilih tanggal log yang ingin dihapus.', 'warning');
+          showToast('Please select the log date you want to delete.', 'warning');
           return;
         }
 
         if (range === 'before_date' && !beforeDate) {
-          showToast('Silakan pilih batas tanggal yang ingin dihapus.', 'warning');
+          showToast('Please select the date limit for deletion.', 'warning');
           return;
         }
 
         // Disable button and show spinner
         confirmBtn.disabled = true;
         const originalText = btnText.textContent;
-        btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Menghapus...';
+        btnText.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span> Deleting.';
 
         try {
           const res = await SentinelAPI.deleteLogs({ range, date, beforeDate });
-          showToast(res.message || 'Data log berhasil dihapus.', 'success');
+          showToast(res.message || 'Log data deleted successfully.', 'success');
           deleteModal?.hide();
           await populateDateFilter();
           await loadLogsData();
         } catch (err) {
-          showToast(err.message || 'Gagal menghapus data log.', 'danger');
+          showToast(err.message || 'Failed to delete log data.', 'danger');
         } finally {
           confirmBtn.disabled = false;
           btnText.textContent = originalText;
@@ -731,7 +747,7 @@
     }
 
     async function loadLogsData() {
-      const date = document.getElementById('logs-date-filter')?.value || '';
+      const { range, from, to } = getLogsDateFilterParams();
       const status = document.getElementById('logs-status-filter')?.value || '';
       const search = document.getElementById('table-filter')?.value || '';
 
@@ -739,7 +755,9 @@
       try {
         if (typeof SentinelAPI !== 'undefined' && SentinelAPI.getLogs) {
           const res = await SentinelAPI.getLogs({
-            date,
+            range,
+            from,
+            to,
             status,
             search,
             limit: 200,

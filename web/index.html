@@ -214,9 +214,18 @@
                   <span class="input-group-text bg-body-secondary border-end-0">
                     <i class="bi bi-calendar3"></i>
                   </span>
-                  <select class="form-select form-select-sm" id="dashboard-date-filter" onchange="SentinelDashboard.refresh()" title="Filter by date">
-                    <!-- Dynamically populated -->
+                  <select class="form-select form-select-sm" id="dashboard-date-filter" onchange="SentinelDashboard.onDateFilterChange()" title="Filter by date">
+                    <option value="all">All time</option>
+                    <option value="1d">1 day</option>
+                    <option value="1w">1 week</option>
+                    <option value="1m">1 month</option>
+                    <option value="custom">Range date</option>
                   </select>
+                </div>
+                <div class="input-group input-group-sm w-auto d-none" id="dashboard-date-range">
+                  <input type="date" class="form-control form-control-sm" id="dashboard-date-from" onchange="SentinelDashboard.refresh()" title="From date">
+                  <span class="input-group-text bg-body-secondary">to</span>
+                  <input type="date" class="form-control form-control-sm" id="dashboard-date-to" onchange="SentinelDashboard.refresh()" title="To date">
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" onclick="SentinelDashboard.refresh()" title="Refresh Data">
                   <i class="bi bi-arrow-clockwise"></i>
@@ -241,8 +250,8 @@
             <div class="col-lg-3 col-sm-6 col-12">
               <div class="small-box text-bg-info mb-0">
                 <div class="inner">
-                  <h3 id="metric-total-requests">0</h3>
-                  <p>Total Requests</p>
+                  <h3 id="metric-total-requests" class="text-white">0</h3>
+                  <p class="text-white">Total Requests</p>
                 </div>
                 <i class="small-box-icon bi bi-graph-up"></i>
                 <a href="./logs" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
@@ -269,11 +278,11 @@
             <div class="col-lg-3 col-sm-6 col-12">
               <div class="small-box text-bg-warning mb-0">
                 <div class="inner">
-                  <h3 id="metric-blocked">0</h3>
-                  <p>Blocked (403)</p>
+                  <h3 id="metric-blocked" class="text-white">0</h3>
+                  <p class="text-white">Blocked (403)</p>
                 </div>
                 <i class="small-box-icon bi bi-slash-circle"></i>
-                <a href="./keys" class="small-box-footer link-dark link-underline-opacity-0 link-underline-opacity-50-hover">
+                <a href="./keys" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
                   Key Whitelist <i class="bi bi-arrow-right-circle"></i>
                 </a>
               </div>

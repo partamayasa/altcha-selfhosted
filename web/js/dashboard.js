@@ -81,49 +81,38 @@ const SentinelDashboard = {
   },
 
   async populateDateFilter() {
-    const dashSelect = document.getElementById('dashboard-date-filter');
-    if (!dashSelect) return;
+    this.updateDateRangeVisibility();
+  },
 
-    let dates = [];
-    try {
-      if (typeof SentinelAPI !== 'undefined' && SentinelAPI?.getLogDates) {
-        dates = await SentinelAPI.getLogDates();
-      }
-    } catch (err) {
-      console.warn('[SentinelDashboard] Failed to fetch log dates:', err.message);
+  onDateFilterChange() {
+    this.updateDateRangeVisibility();
+    this.refresh();
+  },
+
+  updateDateRangeVisibility() {
+    const select = document.getElementById('dashboard-date-filter');
+    const rangeWrap = document.getElementById('dashboard-date-range');
+    if (select && rangeWrap) {
+      rangeWrap.classList.toggle('d-none', select.value !== 'custom');
     }
+  },
 
-    const currentVal = dashSelect.value;
-    dashSelect.innerHTML = '';
-
-    // Add 'All Time' option
-    const allOpt = document.createElement('option');
-    allOpt.value = 'all';
-    allOpt.textContent = 'Semua Waktu (All Time)';
-    dashSelect.appendChild(allOpt);
-
-    if (dates && dates.length > 0) {
-      dates.forEach((d, idx) => {
-        const opt = document.createElement('option');
-        opt.value = d;
-        opt.textContent = `${d} ${idx === 0 ? '(Latest)' : ''}`;
-        if (currentVal ? opt.value === currentVal : idx === 0) {
-          opt.selected = true;
-        }
-        dashSelect.appendChild(opt);
-      });
-    } else {
-      allOpt.selected = true;
+  getDateFilterParams() {
+    const select = document.getElementById('dashboard-date-filter');
+    const range = select ? select.value : 'all';
+    const params = { range };
+    if (range === 'custom') {
+      params.from = document.getElementById('dashboard-date-from')?.value || '';
+      params.to = document.getElementById('dashboard-date-to')?.value || '';
     }
+    return params;
   },
 
   async refresh() {
     let stats = null;
     try {
-      const dateSelect = document.getElementById('dashboard-date-filter');
-      const selectedDate = dateSelect ? dateSelect.value : '';
       if (typeof SentinelAPI !== 'undefined' && SentinelAPI?.getStats) {
-        stats = await SentinelAPI.getStats(selectedDate);
+        stats = await SentinelAPI.getStats(this.getDateFilterParams());
       }
     } catch (err) {
       console.warn('[SentinelDashboard] API unavailable or failed, falling back to telemetry dataset:', err.message);
@@ -302,7 +291,7 @@ const SentinelDashboard = {
       container.innerHTML = `
         <div class="text-center py-4 text-secondary small">
           <i class="bi bi-globe2 d-block fs-4 mb-2 text-secondary opacity-50"></i>
-          <span>Tidak ada data domain origin</span>
+          <span>No origin domain data</span>
         </div>
       `;
       return;
@@ -359,7 +348,7 @@ const SentinelDashboard = {
       container.innerHTML = `
         <div class="text-center py-4 text-secondary small">
           <i class="bi bi-router d-block fs-4 mb-2 text-secondary opacity-50"></i>
-          <span>Tidak ada data client IP</span>
+          <span>No client IP data</span>
         </div>
       `;
       return;
