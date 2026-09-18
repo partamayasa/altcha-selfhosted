@@ -36,15 +36,27 @@ const SentinelAPI = {
   },
 
   // Telemetry & Stats
-  async getStats(date = '') {
-    const query = date ? `?date=${encodeURIComponent(date)}` : '';
-    return this.request(`/api/sentinel/stats${query}`);
+  async getStats(params = {}) {
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        query.set(key, value);
+      }
+    }
+    const qs = query.toString();
+    return this.request(`/api/sentinel/stats${qs ? `?${qs}` : ''}`);
   },
 
   // Audit Logs
   async getLogs(params = {}) {
-    const query = new URLSearchParams(params).toString();
-    return this.request(`/api/sentinel/logs?${query}`);
+    const query = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        query.set(key, value);
+      }
+    }
+    const qs = query.toString();
+    return this.request(`/api/sentinel/logs${qs ? `?${qs}` : ''}`);
   },
 
   async getLogDates() {
@@ -80,6 +92,18 @@ const SentinelAPI = {
   // Server Engine Config
   async getConfig() {
     return this.request('/api/sentinel/config');
+  },
+
+  // PoW Engine Config (Database-managed)
+  async getPowConfig() {
+    return this.request('/api/sentinel/pow-config');
+  },
+
+  async savePowConfig(payload) {
+    return this.request('/api/sentinel/pow-config', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 
   // Redis Actions

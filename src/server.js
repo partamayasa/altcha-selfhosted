@@ -58,6 +58,42 @@ function getNowInTimezone(tz = CONFIG.timezone) {
   }
 }
 
+function shiftDate(dateStr, days) {
+  if (!dateStr) return '';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const dt = new Date(Date.UTC(year, month - 1, day + days));
+  return dt.toISOString().split('T')[0];
+}
+
+function resolveDateRange({ range = '', from = '', to = '', date = '' } = {}) {
+  // Backward-compatible single-date selection
+  if (!range) {
+    if (date && date !== 'all') {
+      return { from: date, to: date };
+    }
+    return { from, to };
+  }
+
+  if (range === 'all') {
+    return { from, to };
+  }
+
+  const today = getNowInTimezone().date;
+  switch (range) {
+    case '1d':
+      return { from: today, to: today };
+    case '1w':
+      return { from: shiftDate(today, -6), to: today };
+    case '1m':
+      return { from: shiftDate(today, -29), to: today };
+    case 'custom':
+      return { from, to };
+    default:
+      return { from, to };
+  }
+}
+
+
 function writeAccessLog(entry, structuredData = null) {
   console.log(entry);
 
@@ -515,6 +551,16 @@ let isDbInitialized = false;
 app.use((req, res, next) => {
   if (!isDbInitialized) {
     SentinelDB.ensureInitialized();
+    // Override CONFIG with database values after DB is seeded
+    try {
+      const dbPow = SentinelDB.getPowSettings();
+      CONFIG.cost = parseInt(dbPow.altcha_cost, 10) || CONFIG.cost;
+      CONFIG.expiresIn = parseInt(dbPow.expires_in, 10) || CONFIG.expiresIn;
+      CONFIG.rateLimitMax = parseInt(dbPow.rate_limit_max, 10) || CONFIG.rateLimitMax;
+      CONFIG.rateLimitWindowMs = parseInt(dbPow.rate_limit_window_ms, 10) || CONFIG.rateLimitWindowMs;
+    } catch (e) {
+      console.warn('[pow-config] Could not load DB config, using .env defaults:', e.message);
+    }
     isDbInitialized = true;
   }
   next();
@@ -663,12 +709,13 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
 
 // Sentinel Management APIs
 app.get('/api/sentinel/stats', requireAuth, (req, res) => {
-  const requestedDate = req.query.date;
-  const stats = SentinelDB.getStats(requestedDate);
+  const { range, from, to, date } = req.query;
+  const { from: fromDate, to: toDate } = resolveDateRange({ range, from, to, date });
+  const stats = SentinelDB.getStats({ from: fromDate, to: toDate });
   const mem = process.memoryUsage();
 
   res.json({
-    date: stats?.date || requestedDate || new Date().toISOString().split('T')[0],
+    date: stats?.date || fromDate || toDate || new Date().toISOString().split('T')[0],
     totalRequests: stats?.totalRequests || 0,
     avgLatencyMs: stats?.avgLatencyMs || 0,
     challengesCount: stats?.challengesCount || 0,
@@ -702,8 +749,9 @@ app.get('/api/sentinel/stats', requireAuth, (req, res) => {
 });
 
 app.get('/api/sentinel/logs', requireAuth, (req, res) => {
-  const { date, status, search, page = 1, limit = 50 } = req.query;
-  const result = SentinelDB.getLogs({ date, status, search, page, limit });
+  const { date, status, search, page = 1, limit = 50, range, from, to } = req.query;
+  const { from: fromDate, to: toDate } = resolveDateRange({ range, from, to, date });
+  const result = SentinelDB.getLogs({ from: fromDate, to: toDate, status, search, page, limit });
   res.json(result);
 });
 
@@ -717,21 +765,22 @@ app.delete('/api/sentinel/logs', requireAuth, requireAdmin, (req, res) => {
     const result = SentinelDB.deleteLogs({ range, date, beforeDate });
     res.json({
       success: true,
-      message: `Berhasil menghapus ${result.deletedCount} data log.`,
+      message: `Successfully deleted ${result.deletedCount} log entries.`,
       deletedCount: result.deletedCount
     });
   } catch (err) {
-    res.status(400).json({ error: err.message || 'Gagal menghapus data log.' });
+    res.status(400).json({ error: err.message || 'Failed to delete log data.' });
   }
 });
 
 app.get('/api/sentinel/config', requireAuth, (req, res) => {
+  const powSettings = SentinelDB.getPowSettings();
   res.json({
     algorithm: CONFIG.algorithm,
-    cost: CONFIG.cost,
-    expiresIn: CONFIG.expiresIn,
-    rateLimitMax: CONFIG.rateLimitMax,
-    rateLimitWindowMs: CONFIG.rateLimitWindowMs,
+    cost: parseInt(powSettings.altcha_cost, 10) || CONFIG.cost,
+    expiresIn: parseInt(powSettings.expires_in, 10) || CONFIG.expiresIn,
+    rateLimitMax: parseInt(powSettings.rate_limit_max, 10) || CONFIG.rateLimitMax,
+    rateLimitWindowMs: parseInt(powSettings.rate_limit_window_ms, 10) || CONFIG.rateLimitWindowMs,
     redisConnected: !!redisClient?.isOpen,
     trustProxy: parsedProxy,
     port: CONFIG.port,
@@ -820,7 +869,17 @@ app.post('/api/sentinel/app-settings', requireAuth, requireAdmin, (req, res) => 
   res.json({ success: true, settings: SentinelDB.getSettings() });
 });
 
-// Update PoW Engine Config (.env)
+// GET PoW Engine Config from database
+app.get('/api/sentinel/pow-config', requireAuth, (req, res) => {
+  try {
+    const settings = SentinelDB.getPowSettings();
+    res.json({ success: true, settings });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to load PoW configuration: ' + err.message });
+  }
+});
+
+// Update PoW Engine Config (saves to database)
 app.post('/api/sentinel/pow-config', requireAuth, requireAdmin, (req, res) => {
   const { altcha_cost, expires_in, rate_limit_max, rate_limit_window_ms } = req.body;
 
@@ -828,40 +887,13 @@ app.post('/api/sentinel/pow-config', requireAuth, requireAdmin, (req, res) => {
     return res.status(400).json({ error: 'No configuration provided.' });
   }
 
-  let envContent = '';
-  if (fs.existsSync(PATHS.envFile)) {
-    try {
-      envContent = fs.readFileSync(PATHS.envFile, 'utf8');
-    } catch (e) {
-      return res.status(500).json({ error: 'Could not read .env file: ' + e.message });
-    }
+  const success = SentinelDB.setPowSettings({ altcha_cost, expires_in, rate_limit_max, rate_limit_window_ms });
+  if (!success) {
+    return res.status(500).json({ error: 'Failed to save PoW configuration to database.' });
   }
 
-  const updateEnv = (key, val) => {
-    if (val !== undefined && val !== '') {
-      const regex = new RegExp(`^${key}=.*`, 'm');
-      if (regex.test(envContent)) {
-        envContent = envContent.replace(regex, `${key}=${val}`);
-      } else {
-        envContent += `\n${key}=${val}`;
-      }
-    }
-  };
-
-  updateEnv('ALTCHA_COST', altcha_cost);
-  updateEnv('EXPIRES_IN', expires_in);
-  updateEnv('RATE_LIMIT_MAX', rate_limit_max);
-  updateEnv('RATE_LIMIT_WINDOW_MS', rate_limit_window_ms);
-
-  try {
-    fs.writeFileSync(PATHS.envFile, envContent.trim() + '\n', 'utf8');
-    console.log('[pow-config] .env updated successfully');
-  } catch (err) {
-    console.error('[pow-config] Failed to write .env:', err.message);
-    return res.status(500).json({ error: 'Could not save .env file: ' + err.message });
-  }
-
-  res.json({ success: true, message: 'Engine configuration updated successfully.' });
+  console.log('[pow-config] Configuration saved to database successfully');
+  res.json({ success: true, message: 'Engine configuration updated and saved to database successfully.' });
 });
 
 // User Management APIs (Administrator only)
