@@ -1,4 +1,4 @@
-# ALTCHA Self-Hosted & Manager (Sentinel)
+# ALTCHA Self-Hosted & Manager
 
 ALTCHA is a self-hosted, privacy-first security solution that protects your websites, APIs, and online services from spam and abuse through a proof-of-work mechanism. This repository provides the complete backend service, rate limiter, domain whitelist protection, dual-database SQLite audit logging, and an integrated AdminLTE v4 management dashboard.
 
@@ -52,17 +52,20 @@ altcha-selfhosted/
 ## Quick Start (Local)
 
 1. **Install Dependencies**:
+
    ```bash
    npm install
    ```
 
 2. **Configure Environment**:
    Copy `.env.example` to `.env` and configure your settings:
+
    ```bash
    cp .env.example .env
    ```
 
 3. **Start the Application**:
+
    ```bash
    # Production mode
    npm start
@@ -218,5 +221,6 @@ docker compose ps
 ```
 
 ### Persistent Volumes
+
 - `./database`: Contains SQLite database files (`altcha.db` and `log.altcha.db`).
 - `./web`: Frontend templates and static assets.

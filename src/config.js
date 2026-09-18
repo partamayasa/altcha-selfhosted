@@ -25,6 +25,21 @@ export const PATHS = {
   envFile: path.join(ROOT_DIR, '.env')
 };
 
+function resolveRedisUrl() {
+  const envVal = (process.env.REDIS_URL || '').trim();
+  if (envVal === 'none' || envVal === 'disabled' || envVal === 'false') {
+    return '';
+  }
+  if (envVal) {
+    return envVal;
+  }
+  // If running inside Docker container (/.dockerenv exists), auto-connect to bundled redis container
+  if (fs.existsSync('/.dockerenv')) {
+    return 'redis://redis:6379';
+  }
+  return '';
+}
+
 export const CONFIG = {
   port: parseInt(process.env.PORT, 10) || 3000,
   host: process.env.HOST || '0.0.0.0',
@@ -35,8 +50,8 @@ export const CONFIG = {
   expiresIn: parseInt(process.env.EXPIRES_IN, 10) || 300,
   corsOrigin: process.env.CORS_ORIGIN || '*',
   trustProxy: process.env.TRUST_PROXY || '1',
-  redisUrl: (process.env.REDIS_URL || '').trim(),
-  redisRetryAttempts: !isNaN(Number(process.env.REDIS_RETRY_ATTEMPTS)) ? Number(process.env.REDIS_RETRY_ATTEMPTS) : 5,
+  redisUrl: resolveRedisUrl(),
+  redisRetryAttempts: Math.max(1, parseInt(process.env.REDIS_RETRY_ATTEMPTS, 10) || 5),
   redisRetryDelayMs: parseInt(process.env.REDIS_RETRY_DELAY_MS, 10) || 500,
   rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== 'false',
   rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 60000,

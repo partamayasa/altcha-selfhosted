@@ -8,7 +8,7 @@
   <!--begin::Primary Meta Tags-->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="title" content="PoW Engine Policy | ALTCHA Manager" />
-  <meta name="description" content="ALTCHA Manager - Proof-of-Work engine policy and application settings." />
+  <meta name="description" content="ALTCHA Manager - Proof-of-Work engine policy." />
   <!--end::Primary Meta Tags-->
 
   <!--begin::Accessibility Features-->
@@ -39,8 +39,18 @@
   <!-- Clean Lightweight Typography - Avoid Bold Fonts -->
   <style>
     body,
-    h1, h2, h3, h4, h5, h6,
-    .h1, .h2, .h3, .h4, .h5, .h6,
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    .h1,
+    .h2,
+    .h3,
+    .h4,
+    .h5,
+    .h6,
     .card-title,
     .brand-text,
     .nav-link p,
@@ -103,7 +113,7 @@
     <!--begin::Sidebar (Loaded via Template)-->
     <div data-template="sidebar"></div>
     <script>
-      (function(){
+      (function () {
         try {
           var s = sessionStorage.getItem('sentinel_tpl_./templates/sidebar.html');
           var el = document.querySelector('[data-template="sidebar"]');
@@ -111,7 +121,7 @@
           var h = sessionStorage.getItem('sentinel_tpl_./templates/header.html');
           var hel = document.querySelector('[data-template="header"]');
           if (h && hel) { var th = document.createElement('template'); th.innerHTML = h.trim(); hel.replaceWith(th.content); }
-        } catch(e){}
+        } catch (e) { }
       })();
     </script>
     <!--end::Sidebar-->
@@ -145,7 +155,7 @@
         <div class="container-fluid">
           <div class="row g-4">
 
-            <!-- Left Column: Engine Policy + Redis -->
+            <!-- Left Column: Engine Parameters -->
             <div class="col-lg-6">
 
               <!-- Engine Configuration Card -->
@@ -187,30 +197,14 @@
                 </div>
                 <div class="card-footer py-2 px-3 text-secondary" style="font-size: 0.8rem;">
                   <i class="bi bi-info-circle me-1"></i>
-                  Engine parameters are configured via environment variables and require a server restart to take effect.
-                </div>
-              </div>
-
-              <!-- Solve Time Estimator Card -->
-              <div class="card card-outline card-secondary shadow-sm mb-4">
-                <div class="card-header py-2 px-3">
-                  <h3 class="card-title fs-6 mb-0">
-                    <i class="bi bi-stopwatch me-2 text-secondary"></i> Client Solve Time Estimator
-                  </h3>
-                </div>
-                <div class="card-body px-3 py-3">
-                  <p class="text-secondary small mb-2">
-                    Based on the configured cost, here is a rough estimate of how long a browser will take to solve the PoW challenge:
-                  </p>
-                  <div id="calc-estimate-result" class="text-body" style="font-size: 0.85rem;">
-                    Loading estimate
-                  </div>
+                  Engine parameters are configured via environment variables and require a server restart to take
+                  effect.
                 </div>
               </div>
 
             </div>
 
-            <!-- Right Column: Redis + App Settings -->
+            <!-- Right Column: Redis + Solve Time Estimator -->
             <div class="col-lg-6">
 
               <!-- Redis Anti-Replay Cache Card -->
@@ -235,50 +229,21 @@
                 </div>
               </div>
 
-              <!-- App Settings Card -->
-              <div class="card card-outline card-success shadow-sm mb-4">
+              <!-- Solve Time Estimator Card -->
+              <div class="card card-outline card-secondary shadow-sm mb-4">
                 <div class="card-header py-2 px-3">
                   <h3 class="card-title fs-6 mb-0">
-                    <i class="bi bi-gear me-2 text-success"></i> Application Settings
+                    <i class="bi bi-stopwatch me-2 text-secondary"></i> Client Solve Time Estimator
                   </h3>
                 </div>
                 <div class="card-body px-3 py-3">
-                  <p class="text-secondary small mb-3">
-                    Customize the display name, tagline, and footer text of this ALTCHA Manager instance. Changes take effect immediately on all pages.
+                  <p class="text-secondary small mb-2">
+                    Based on the configured cost, here is a rough estimate of how long a browser will take to solve the
+                    PoW challenge:
                   </p>
-
-                  <div class="mb-3">
-                    <label class="form-label text-secondary small mb-1" for="app-setting-app_name">
-                      Application Name
-                    </label>
-                    <input type="text" class="form-control form-control-sm" id="app-setting-app_name"
-                      placeholder="e.g. ALTCHA Manager" maxlength="80" />
-                    <div class="form-text">Displayed in browser title bar, sidebar logo, and login page.</div>
+                  <div id="calc-estimate-result" class="text-body" style="font-size: 0.85rem;">
+                    Loading estimate
                   </div>
-
-                  <div class="mb-3">
-                    <label class="form-label text-secondary small mb-1" for="app-setting-app_tagline">
-                      Tagline / Description
-                    </label>
-                    <input type="text" class="form-control form-control-sm" id="app-setting-app_tagline"
-                      placeholder="e.g. Self-Hosted CAPTCHA Service" maxlength="120" />
-                    <div class="form-text">Short description shown in the header area.</div>
-                  </div>
-
-                  <div class="mb-3">
-                    <label class="form-label text-secondary small mb-1" for="app-setting-app_footer">
-                      Footer Text
-                    </label>
-                    <input type="text" class="form-control form-control-sm" id="app-setting-app_footer"
-                      placeholder="e.g. Copyright © 2026 ALTCHA Manager. All rights reserved."
-                      maxlength="200" />
-                    <div class="form-text">Copyright notice displayed at the bottom of every page.</div>
-                  </div>
-                </div>
-                <div class="card-footer py-2 px-3 d-flex justify-content-end">
-                  <button class="btn btn-sm btn-success" onclick="SentinelSettings.saveAppSettings()">
-                    <i class="bi bi-floppy me-1"></i> Save Settings
-                  </button>
                 </div>
               </div>
 
@@ -304,8 +269,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
     crossorigin="anonymous"></script>
   <!--end::Required Plugin(popperjs for Bootstrap 5)--><!--begin::Required Plugin(Bootstrap 5)-->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"
-    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js" crossorigin="anonymous"></script>
   <!--end::Required Plugin(Bootstrap 5)--><!--begin::Required Plugin(AdminLTE)-->
   <script src="./js/adminlte.js"></script>
   <!--end::Required Plugin(AdminLTE)-->
@@ -315,7 +279,6 @@
 
   <!-- Sentinel Scripts -->
   <script src="./js/auth-guard.js"></script>
-  <script src="./js/app-settings.js"></script>
   <script src="./js/api.js"></script>
 
   <script>

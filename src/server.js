@@ -377,13 +377,15 @@ async function connectRedis() {
     return;
   }
 
-  let retries = CONFIG.redisRetryAttempts;
-  while (retries > 0) {
+  const maxAttempts = Math.max(1, CONFIG.redisRetryAttempts || 5);
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    attempt++;
     try {
       const client = createClient({
         url: CONFIG.redisUrl,
         socket: {
-          reconnectStrategy: false
+          reconnectStrategy: (retries) => Math.min(retries * 100, 3000)
         }
       });
       client.on('error', (err) => {
@@ -396,9 +398,8 @@ async function connectRedis() {
       console.log('Connected to Redis successfully.');
       return;
     } catch (err) {
-      retries -= 1;
-      console.error(`Failed to connect to Redis (${err.message}). Remaining retries: ${retries}`);
-      if (retries === 0) {
+      console.error(`Failed to connect to Redis (${err.message}). Attempt ${attempt}/${maxAttempts}`);
+      if (attempt >= maxAttempts) {
         console.error('Unable to connect to Redis. Application will continue running without anti-replay cache.');
       } else {
         await new Promise((res) => setTimeout(res, CONFIG.redisRetryDelayMs));

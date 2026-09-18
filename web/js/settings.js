@@ -6,10 +6,7 @@ const SentinelSettings = {
   config: null,
 
   async init() {
-    await Promise.all([
-      this.loadConfig(),
-      this.loadAppSettings(),
-    ]);
+    await this.loadConfig();
   },
 
   // Engine / PoW Config
