@@ -144,7 +144,11 @@ function seedDefaultSettings() {
     ['app_tagline', 'Self-Hosted CAPTCHA Service'],
     ['app_url', 'http://localhost:3000'],
     ['app_port', '3000'],
-    ['app_footer', 'Copyright \u00a9 2026 ALTCHA Manager. All rights reserved.']
+    ['app_footer', 'Copyright \u00a9 2026 ALTCHA Manager. All rights reserved.'],
+    ['pow_altcha_cost', process.env.ALTCHA_COST || '5000'],
+    ['pow_expires_in', process.env.EXPIRES_IN || '300'],
+    ['pow_rate_limit_max', process.env.RATE_LIMIT_MAX || '15'],
+    ['pow_rate_limit_window_ms', process.env.RATE_LIMIT_WINDOW_MS || '60000'],
   ];
   const seedStmt = db.prepare(
     `INSERT OR IGNORE INTO app_settings (key, value, updated_at) VALUES (?, ?, ?)`
@@ -251,20 +255,21 @@ export const SentinelDB = {
   /**
    * Get analytics & stats for a given date
    */
-  getStats(targetDate = '') {
+  getStats({ from = '', to = '' } = {}) {
     try {
-      const dates = this.getAvailableDates();
-      const isAll = targetDate === 'all';
-      let date = null;
-      if (!isAll) {
-        date = targetDate && dates.includes(targetDate)
-          ? targetDate
-          : (dates[0] || new Date().toLocaleDateString('sv-SE'));
+      const conditions = [];
+      const dateParams = [];
+      if (from) {
+        conditions.push('date >= ?');
+        dateParams.push(from);
+      }
+      if (to) {
+        conditions.push('date <= ?');
+        dateParams.push(to);
       }
 
-      const dateClause = isAll ? '' : 'WHERE date = ?';
-      const dateParams = isAll ? [] : [date];
-      const andDateClause = isAll ? '' : 'AND date = ?';
+      const dateClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+      const andDateClause = conditions.length ? `AND ${conditions.join(' AND ')}` : '';
 
       // 1. Total Requests & Average Latency
       const totalStmt = logDb.prepare(`
@@ -370,7 +375,7 @@ export const SentinelDB = {
       });
 
       return {
-        date: isAll ? 'all' : date,
+        date: (from || to) ? (from === to ? from : `${from || ''}..${to || ''}`) : 'all',
         totalRequests,
         avgLatencyMs,
         challengesCount,
@@ -392,24 +397,19 @@ export const SentinelDB = {
   /**
    * Get paginated logs with search & status filters
    */
-  getLogs({ date = '', status = null, search = '', page = 1, limit = 50 }) {
+  getLogs({ from = '', to = '', status = null, search = '', page = 1, limit = 50 }) {
     try {
-      const dates = this.getAvailableDates();
-      let targetDate = null;
-      if (date === 'all') {
-        targetDate = null;
-      } else if (date) {
-        targetDate = dates.includes(date) ? date : date;
-      } else if (date === undefined) {
-        targetDate = dates[0] || null;
-      }
-
       const conditions = [];
       const params = [];
 
-      if (targetDate) {
-        conditions.push(`date = ?`);
-        params.push(targetDate);
+      if (from) {
+        conditions.push(`date >= ?`);
+        params.push(from);
+      }
+
+      if (to) {
+        conditions.push(`date <= ?`);
+        params.push(to);
       }
 
       if (status !== null && status !== undefined && status !== '') {
@@ -488,7 +488,7 @@ export const SentinelDB = {
         }
       } else if (range === 'date') {
         if (!date || !date.trim()) {
-          throw new Error('Tanggal (date) harus ditentukan untuk penghapusan per tanggal.');
+          throw new Error('A date must be specified for per-date deletion.');
         }
         const stmt = logDb.prepare(`DELETE FROM access_logs WHERE date = ?`);
         const info = stmt.run(date.trim());
@@ -515,13 +515,13 @@ export const SentinelDB = {
         deletedCount = info.changes;
       } else if (range === 'before_date') {
         if (!beforeDate || !beforeDate.trim()) {
-          throw new Error('Tanggal batas (beforeDate) harus ditentukan.');
+          throw new Error('A boundary date (beforeDate) must be specified.');
         }
         const stmt = logDb.prepare(`DELETE FROM access_logs WHERE date < ?`);
         const info = stmt.run(beforeDate.trim());
         deletedCount = info.changes;
       } else {
-        throw new Error(`Rentang waktu penghapusan tidak valid: '${range}'`);
+        throw new Error(`Invalid deletion time range: '${range}'`);
       }
 
       return {
@@ -557,6 +557,55 @@ export const SentinelDB = {
     } catch (err) {
       console.error('[Database] Error fetching setting:', err.message);
       return defaultValue;
+    }
+  },
+
+  /**
+   * Get PoW engine settings from database
+   */
+  getPowSettings() {
+    try {
+      const keys = ['pow_altcha_cost', 'pow_expires_in', 'pow_rate_limit_max', 'pow_rate_limit_window_ms'];
+      const rows = db.prepare(
+        `SELECT key, value FROM app_settings WHERE key IN (${keys.map(() => '?').join(',')})`
+      ).all(...keys);
+      const settings = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      return {
+        altcha_cost: settings.pow_altcha_cost || '5000',
+        expires_in: settings.pow_expires_in || '300',
+        rate_limit_max: settings.pow_rate_limit_max || '15',
+        rate_limit_window_ms: settings.pow_rate_limit_window_ms || '60000',
+      };
+    } catch (err) {
+      console.error('[Database] Error fetching PoW settings:', err.message);
+      return {
+        altcha_cost: '5000',
+        expires_in: '300',
+        rate_limit_max: '15',
+        rate_limit_window_ms: '60000',
+      };
+    }
+  },
+
+  /**
+   * Save PoW engine settings to database
+   */
+  setPowSettings({ altcha_cost, expires_in, rate_limit_max, rate_limit_window_ms }) {
+    try {
+      const now = new Date().toISOString();
+      const stmt = db.prepare(
+        `INSERT INTO app_settings (key, value, updated_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
+      );
+      if (altcha_cost !== undefined && altcha_cost !== '') stmt.run('pow_altcha_cost', String(altcha_cost), now);
+      if (expires_in !== undefined && expires_in !== '') stmt.run('pow_expires_in', String(expires_in), now);
+      if (rate_limit_max !== undefined && rate_limit_max !== '') stmt.run('pow_rate_limit_max', String(rate_limit_max), now);
+      if (rate_limit_window_ms !== undefined && rate_limit_window_ms !== '') stmt.run('pow_rate_limit_window_ms', String(rate_limit_window_ms), now);
+      return true;
+    } catch (err) {
+      console.error('[Database] Error saving PoW settings:', err.message);
+      return false;
     }
   },
 
