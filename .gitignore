@@ -1,4 +1,14 @@
-.env
-node_modules/
-database/*
 .admin-lte-v4.9.1
+.bash_history
+.bash_logout
+.bash_profile
+.bashrc
+.cache
+.cline
+.config
+.docker
+.dotnet
+.env
+.vscode-server
+database/*
+node_modules/

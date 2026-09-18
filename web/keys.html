@@ -145,7 +145,7 @@
                   <div>
                     <div class="d-flex align-items-center justify-content-between mb-2">
                       <label class="form-label text-secondary small mb-0">Active Secret API Key</label>
-                      <span class="text-muted small" id="my-username-display">Account: Loading...</span>
+                      <span class="text-muted small" id="my-username-display">Account: Loading.</span>
                     </div>
 
                     <div class="key-display-box mb-3 d-flex align-items-center justify-content-between gap-2"
@@ -175,11 +175,11 @@
                         </button>
                       </div>
                       <div id="my-domains-list" class="d-flex flex-wrap gap-1 mb-2">
-                        <span class="text-muted small">Loading domains...</span>
+                        <span class="text-muted small">Loading domains.</span>
                       </div>
                       <p class="text-muted mb-0" style="font-size:0.78rem;">
-                        Metode whitelist aktif: hanya request dari domain yang didaftarkan di atas yang diizinkan.
-                        Selain domain tersebut, semua request akan diblokir otomatis.
+                        Whitelist mode active: only requests from domains listed above are allowed.
+                        Requests from any other domain will be blocked automatically.
                       </p>
                     </div>
                   </div>
@@ -365,9 +365,9 @@ Content-Type: application/json
           <textarea id="editDomainsTextarea" class="form-control font-monospace" rows="6"
             placeholder="https://example.com&#10;https://app.mysite.com&#10;*.mysite.com"></textarea>
           <p class="text-muted mt-2 mb-0" style="font-size:0.78rem;">
-            Gunakan metode <strong>whitelist</strong>: selain domain yang didaftarkan di sini, semua request akan
-            diblokir. Gunakan <code>*.domain.com</code> untuk wildcard subdomain, atau <code>*</code> untuk mengizinkan
-            semua domain.
+            Use the <strong>whitelist</strong> method: requests from any domain not listed here will be
+            blocked. Use <code>*.domain.com</code> for subdomain wildcards, or <code>*</code> to allow
+            all domains.
           </p>
         </div>
         <div class="modal-footer py-2 px-3 justify-content-end">
@@ -493,7 +493,7 @@ Content-Type: application/json
     async function executeRegenerateMyKey() {
       const btn = document.getElementById('btn-confirm-regen-my-key');
       btn.disabled = true;
-      btn.textContent = 'Regenerating...';
+      btn.textContent = 'Regenerating.';
 
       try {
         const res = await fetch('/api/sentinel/keys/regenerate-my-key', {
@@ -675,13 +675,13 @@ Content-Type: application/json
       if (arr.length === 0) {
         list.innerHTML = `
           <span class="badge text-bg-danger-subtle text-danger border border-danger-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;">
-            <i class="bi bi-shield-slash me-1"></i> Belum ada domain terdaftar (Semua request diblokir)
+            <i class="bi bi-shield-slash me-1"></i> No domains registered yet (all requests are blocked)
           </span>`;
       } else {
         list.innerHTML = arr.map(o => {
           if (o === '*') {
             return `<span class="badge text-bg-warning-subtle text-warning border border-warning-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;">
-              <i class="bi bi-globe me-1"></i> Wildcard (*) - Semua domain diizinkan
+              <i class="bi bi-globe me-1"></i> Wildcard (*) - All domains allowed
             </span>`;
           }
           return `<span class="badge text-bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size:0.75rem;font-weight:400;white-space:normal;word-break:break-all;">
@@ -716,7 +716,7 @@ Content-Type: application/json
       if (!currentEditDomainsUserId) return;
       const btn = document.getElementById('btn-save-domains');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving.';
 
       const raw = document.getElementById('editDomainsTextarea').value.trim();
       const origins = raw ? raw.split('\n').map(s => s.trim()).filter(Boolean) : null;
@@ -790,7 +790,7 @@ Content-Type: application/json
       if (!currentAdminTargetUserId) return;
       const btn = document.getElementById('btn-admin-confirm-regen');
       btn.disabled = true;
-      btn.textContent = 'Regenerating...';
+      btn.textContent = 'Regenerating.';
 
       try {
         const res = await fetch(`/api/sentinel/users/${currentAdminTargetUserId}/regenerate-key`, {

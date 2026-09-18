@@ -541,7 +541,7 @@
       if (!targetUserId) return;
       const btn = document.getElementById('btn-confirm-delete');
       btn.disabled = true;
-      btn.textContent = 'Deleting...';
+      btn.textContent = 'Deleting.';
 
       try {
         const res = await fetch(`/api/sentinel/users/${targetUserId}`, {

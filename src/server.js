@@ -448,7 +448,11 @@ await connectRedis();
 
 let rateLimiter = null;
 
-if (CONFIG.rateLimitEnabled) {
+function createRateLimiter() {
+  if (!CONFIG.rateLimitEnabled) {
+    return null;
+  }
+
   let rateLimitStore;
   if (redisClient?.isOpen) {
     try {
@@ -464,7 +468,7 @@ if (CONFIG.rateLimitEnabled) {
     console.log('Rate limiter: In-memory store enabled.');
   }
 
-  rateLimiter = rateLimit({
+  return rateLimit({
     windowMs: CONFIG.rateLimitWindowMs,
     limit: CONFIG.rateLimitMax,
     standardHeaders: 'draft-7',
@@ -482,12 +486,31 @@ if (CONFIG.rateLimitEnabled) {
   });
 }
 
+rateLimiter = createRateLimiter();
+
 const applyRateLimit = (req, res, next) => {
   if (rateLimiter) {
     return rateLimiter(req, res, next);
   }
   next();
 };
+
+// Reload PoW engine settings from the database and apply them to the running
+// engine (challenge parameters + rate limiter) without requiring a restart.
+function reloadPowConfigFromDb() {
+  try {
+    const dbPow = SentinelDB.getPowSettings();
+    CONFIG.cost = parseInt(dbPow.altcha_cost, 10) || CONFIG.cost;
+    CONFIG.expiresIn = parseInt(dbPow.expires_in, 10) || CONFIG.expiresIn;
+    CONFIG.rateLimitMax = parseInt(dbPow.rate_limit_max, 10) || CONFIG.rateLimitMax;
+    CONFIG.rateLimitWindowMs = parseInt(dbPow.rate_limit_window_ms, 10) || CONFIG.rateLimitWindowMs;
+
+    // Rebuild the rate limiter so the updated rate limit / window apply now
+    rateLimiter = createRateLimiter();
+  } catch (e) {
+    console.warn('[pow-config] Could not load DB config, using .env defaults:', e.message);
+  }
+}
 
 const store = {
   get: async (key) => {
@@ -552,15 +575,7 @@ app.use((req, res, next) => {
   if (!isDbInitialized) {
     SentinelDB.ensureInitialized();
     // Override CONFIG with database values after DB is seeded
-    try {
-      const dbPow = SentinelDB.getPowSettings();
-      CONFIG.cost = parseInt(dbPow.altcha_cost, 10) || CONFIG.cost;
-      CONFIG.expiresIn = parseInt(dbPow.expires_in, 10) || CONFIG.expiresIn;
-      CONFIG.rateLimitMax = parseInt(dbPow.rate_limit_max, 10) || CONFIG.rateLimitMax;
-      CONFIG.rateLimitWindowMs = parseInt(dbPow.rate_limit_window_ms, 10) || CONFIG.rateLimitWindowMs;
-    } catch (e) {
-      console.warn('[pow-config] Could not load DB config, using .env defaults:', e.message);
-    }
+    reloadPowConfigFromDb();
     isDbInitialized = true;
   }
   next();
@@ -892,8 +907,11 @@ app.post('/api/sentinel/pow-config', requireAuth, requireAdmin, (req, res) => {
     return res.status(500).json({ error: 'Failed to save PoW configuration to database.' });
   }
 
-  console.log('[pow-config] Configuration saved to database successfully');
-  res.json({ success: true, message: 'Engine configuration updated and saved to database successfully.' });
+  // Apply the new values to the running engine immediately (no restart needed)
+  reloadPowConfigFromDb();
+
+  console.log('[pow-config] Configuration saved to database and applied successfully');
+  res.json({ success: true, message: 'Engine configuration updated and applied immediately.' });
 });
 
 // User Management APIs (Administrator only)

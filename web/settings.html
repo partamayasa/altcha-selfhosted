@@ -127,7 +127,7 @@
           <div class="row g-3" id="settings-content-area">
 
             <!-- Left Column: Settings Form -->
-            <div class="col-lg-7">
+            <div class="col-lg-6">
               <div class="card card-outline card-primary shadow-sm mb-4">
                 <div class="card-header py-2 px-3">
                   <h3 class="card-title fs-6 mb-0">
@@ -147,7 +147,7 @@
                         <input type="text" class="form-control" id="setting-app-name" placeholder="e.g. ALTCHA Manager"
                           required />
                       </div>
-                      <div class="form-text">Ditampilkan pada judul brand, navigasi header, dan title bar browser.</div>
+                      <div class="form-text">Displayed in the brand title, header navigation, and browser title bar.</div>
                     </div>
 
                     <!-- 2. App Protocol & Public Domain -->
@@ -162,10 +162,10 @@
                           <option value="http://">http://</option>
                         </select>
                         <input type="text" class="form-control font-monospace" id="setting-app-domain"
-                          placeholder="captcha.yourdomain.com atau localhost:3000" required
+                          placeholder="captcha.yourdomain.com or localhost:3000" required
                           oninput="updateLivePreviews()" />
                       </div>
-                      <div class="form-text">Pilih skema protokol dan masukkan host/domain (bisa menyertakan port di
+                      <div class="form-text">Choose the protocol scheme and enter the host/domain (you can include a port in
                         local dev).</div>
                     </div>
 
@@ -179,7 +179,7 @@
                         <input type="text" class="form-control" id="setting-app-tagline"
                           placeholder="e.g. Self-Hosted CAPTCHA Service" />
                       </div>
-                      <div class="form-text">Subtitle yang tampil pada halaman login dan identitas header.</div>
+                      <div class="form-text">Subtitle shown on the login page and header identity.</div>
                     </div>
 
                     <div class="d-flex justify-content-end gap-2 pt-3 border-top">
@@ -198,7 +198,7 @@
             </div>
 
             <!-- Right Column: Live Integration Preview -->
-            <div class="col-lg-5">
+            <div class="col-lg-6">
               <div class="card card-outline card-info shadow-sm mb-4">
                 <div class="card-header py-2 px-3">
                   <h3 class="card-title fs-6 mb-0">
@@ -274,7 +274,7 @@ Content-Type: application/json
       setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity .25s'; setTimeout(() => toast.remove(), 300); }, 3500);
     }
 
-    // Ekstrak host/domain bersih jika user menempelkan protokol atau trailing slash
+    // Extract clean host/domain if user pastes a protocol or trailing slash
     function cleanDomain(val) {
       if (!val) return '';
       return val.trim()
@@ -358,7 +358,7 @@ Content-Type: application/json
 
       const rawInput = domainInput.value.trim();
 
-      // Jika user paste URL lengkap dengan protokol, selaraskan dropdown protokolnya
+      // Normalize user input: detect protocol prefix and align the dropdown accordingly
       if (rawInput.toLowerCase().startsWith('http://')) {
         protocolSelect.value = 'http://';
       } else if (rawInput.toLowerCase().startsWith('https://')) {

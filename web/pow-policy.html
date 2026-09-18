@@ -197,8 +197,8 @@
                 </div>
                 <div class="card-footer py-2 px-3 text-secondary" style="font-size: 0.8rem;">
                   <i class="bi bi-info-circle me-1"></i>
-                  Engine parameters are configured via environment variables and require a server restart to take
-                  effect.
+                  Cost, expiry, and rate limits apply immediately via Engine Policy. Algorithm, trust proxy, and
+                  port are set via environment variables.
                 </div>
               </div>
 
@@ -284,7 +284,7 @@
                 </div>
                 <div class="card-footer px-3 py-2">
                   <div class="d-flex justify-content-between align-items-center">
-                    <span class="text-secondary small"><i class="bi bi-terminal me-1"></i> Run <code>docker compose restart altcha-server</code> after saving for changes to take effect.</span>
+                    <span class="text-secondary small"><i class="bi bi-check-circle me-1"></i> Changes apply immediately and are saved to the database.</span>
                     <button type="button" class="btn btn-sm btn-success" id="btn-save-pow-card"
                       onclick="SentinelSettings.savePowSettingsFromCard()">
                       <span id="btn-save-pow-card-text">Save Policy</span>

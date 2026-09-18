@@ -124,7 +124,7 @@ const SentinelSettings = {
     try {
       const res = await SentinelAPI.savePowConfig(payload);
       if (res.success) {
-        SentinelApp.showToast('PoW Engine Policy saved to database!', 'success');
+        SentinelApp.showToast('PoW Engine Policy saved and applied!', 'success');
         // Reload config to refresh display values
         this.powSettings = {
           altcha_cost: payload.altcha_cost,
