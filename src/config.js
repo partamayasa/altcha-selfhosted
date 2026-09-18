@@ -46,7 +46,7 @@ export const CONFIG = {
   hmacKey: process.env.ALTCHA_HMAC_KEY,
   hmacKeySecret: process.env.ALTCHA_HMAC_KEY_SECRET,
   algorithm: process.env.ALTCHA_ALGORITHM || 'PBKDF2/SHA-256',
-  cost: parseInt(process.env.ALTCHA_COST || process.env.MAX_NUMBER, 10) || 5000,
+  cost: parseInt(process.env.ALTCHA_COST, 10) || 5000,
   expiresIn: parseInt(process.env.EXPIRES_IN, 10) || 300,
   corsOrigin: process.env.CORS_ORIGIN || '*',
   trustProxy: process.env.TRUST_PROXY || '1',
