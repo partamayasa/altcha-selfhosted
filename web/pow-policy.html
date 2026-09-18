@@ -155,7 +155,7 @@
         <div class="container-fluid">
           <div class="row g-4">
 
-            <!-- Left Column: Engine Parameters -->
+            <!-- Left Column: Engine Parameters, Redis Cache & Estimator -->
             <div class="col-lg-6">
 
               <!-- Engine Configuration Card -->
@@ -202,61 +202,6 @@
                 </div>
               </div>
 
-              <!-- Manage Engine Settings Card -->
-              <div class="card card-outline card-warning shadow-sm mb-4">
-                <div class="card-header py-2 px-3">
-                  <h3 class="card-title fs-6 mb-0">
-                    <i class="bi bi-pencil-square me-2 text-warning"></i> Manage Engine Policy
-                  </h3>
-                </div>
-                <div class="card-body p-3">
-                  <form id="powSettingsForm" onsubmit="handleSavePowSettings(event)">
-                    <div class="row g-3 mb-3">
-                      <div class="col-md-6">
-                        <label for="input-cost" class="form-label small text-secondary mb-1">
-                          Complexity Cost (iterations)
-                        </label>
-                        <input type="number" class="form-control form-control-sm" id="input-cost"
-                          placeholder="e.g. 5000" required min="100" />
-                      </div>
-                      <div class="col-md-6">
-                        <label for="input-expires" class="form-label small text-secondary mb-1">
-                          Challenge Expiry (seconds)
-                        </label>
-                        <input type="number" class="form-control form-control-sm" id="input-expires"
-                          placeholder="e.g. 300" required min="10" />
-                      </div>
-                      <div class="col-md-6">
-                        <label for="input-ratelimit-max" class="form-label small text-secondary mb-1">
-                          Rate Limit — Max Requests
-                        </label>
-                        <input type="number" class="form-control form-control-sm" id="input-ratelimit-max"
-                          placeholder="e.g. 15" required min="1" />
-                      </div>
-                      <div class="col-md-6">
-                        <label for="input-ratelimit-window" class="form-label small text-secondary mb-1">
-                          Rate Limit — Window (ms)
-                        </label>
-                        <input type="number" class="form-control form-control-sm" id="input-ratelimit-window"
-                          placeholder="e.g. 60000" required min="1000" />
-                      </div>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center pt-2 border-top">
-                      <span class="text-danger small"><i class="bi bi-exclamation-triangle me-1"></i>Note: Restart service to apply changes.</span>
-                      <button type="submit" class="btn btn-sm btn-warning" id="btn-save-pow">
-                        <span id="btn-save-pow-text">Save Configuration</span>
-                        <span id="btn-save-pow-spinner" class="spinner-border spinner-border-sm d-none ms-1"></span>
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-
-            </div>
-
-            <!-- Right Column: Redis + Solve Time Estimator -->
-            <div class="col-lg-6">
-
               <!-- Redis Anti-Replay Cache Card -->
               <div class="card card-outline card-info shadow-sm mb-4">
                 <div class="card-header py-2 px-3">
@@ -264,40 +209,92 @@
                     <i class="bi bi-database me-2 text-info"></i> Anti-Replay Cache (Redis)
                   </h3>
                 </div>
-                <div class="card-body px-3 py-2">
-                  <div class="setting-row">
-                    <span class="setting-label">Redis Status</span>
-                    <span class="setting-value" id="cfg-redis-status">—</span>
+                <div class="card-body p-3">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <span class="text-secondary small">Nonce &amp; challenge cache prevents replay attacks.</span>
+                    <button type="button" class="btn btn-sm btn-outline-danger" id="btn-flush-redis"
+                      onclick="SentinelSettings.flushRedisCache()">
+                      <i class="bi bi-arrow-counterclockwise me-1"></i> Flush Cache
+                    </button>
                   </div>
-                </div>
-                <div class="card-footer py-2 px-3 d-flex justify-content-between align-items-center">
-                  <span class="text-secondary small">Flush all ALTCHA challenge keys from Redis cache</span>
-                  <button class="btn btn-sm btn-outline-danger ms-auto" id="btn-flush-redis" disabled
-                    onclick="SentinelSettings.flushRedisCache()">
-                    <i class="bi bi-trash me-1"></i> Flush Cache
-                  </button>
+                  <hr class="my-2" />
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small">Connection Status</span>
+                    <span id="cfg-redis-status" class="badge">—</span>
+                  </div>
                 </div>
               </div>
 
-              <!-- Solve Time Estimator Card -->
+              <!-- Client Solve Time Estimator Card -->
               <div class="card card-outline card-secondary shadow-sm mb-4">
                 <div class="card-header py-2 px-3">
                   <h3 class="card-title fs-6 mb-0">
                     <i class="bi bi-stopwatch me-2 text-secondary"></i> Client Solve Time Estimator
                   </h3>
                 </div>
-                <div class="card-body px-3 py-3">
-                  <p class="text-secondary small mb-2">
-                    Based on the configured cost, here is a rough estimate of how long a browser will take to solve the
-                    PoW challenge:
+                <div class="card-body p-3">
+                  <p class="small text-secondary mb-2">
+                    Based on the current complexity cost, estimate how long a browser will take to solve the PoW challenge.
                   </p>
-                  <div id="calc-estimate-result" class="text-body" style="font-size: 0.85rem;">
-                    Loading estimate
+                  <div class="p-2 bg-body-tertiary rounded small" id="calc-estimate-result">
+                    Estimated client PoW solve time on browser: <strong>—</strong>
                   </div>
                 </div>
               </div>
 
             </div>
+
+            <!-- Right Column: Database-Managed Engine Policy -->
+            <div class="col-lg-6">
+
+              <!-- Manage Engine Policy Card (Database-managed) -->
+              <div class="card card-outline card-success shadow-sm mb-4">
+                <div class="card-header py-2 px-3">
+                  <h3 class="card-title fs-6 mb-0">
+                    <i class="bi bi-sliders me-2 text-success"></i> Manage Engine Policy
+                  </h3>
+                </div>
+                <div class="card-body px-3 py-3">
+                  <form id="powPolicyForm" onsubmit="return false;">
+                    <div class="mb-3">
+                      <label for="pow-cost" class="form-label small text-secondary mb-1">Complexity Cost (iterations)</label>
+                      <input type="number" class="form-control form-control-sm" id="pow-cost" min="1" step="1000"
+                        placeholder="e.g. 5000" />
+                      <div class="form-text">Higher values increase client solve time.</div>
+                    </div>
+                    <div class="mb-3">
+                      <label for="pow-expires" class="form-label small text-secondary mb-1">Challenge Expiry (seconds)</label>
+                      <input type="number" class="form-control form-control-sm" id="pow-expires" min="1" step="1"
+                        placeholder="e.g. 300" />
+                      <div class="form-text">How long a challenge remains valid before expiring.</div>
+                    </div>
+                    <div class="mb-3">
+                      <label for="pow-rate-max" class="form-label small text-secondary mb-1">Rate Limit — Max Requests</label>
+                      <input type="number" class="form-control form-control-sm" id="pow-rate-max" min="1" step="1"
+                        placeholder="e.g. 15" />
+                      <div class="form-text">Maximum allowed requests within the time window.</div>
+                    </div>
+                    <div class="mb-3">
+                      <label for="pow-rate-window" class="form-label small text-secondary mb-1">Rate Limit — Window (ms)</label>
+                      <input type="number" class="form-control form-control-sm" id="pow-rate-window" min="1000" step="1000"
+                        placeholder="e.g. 60000" />
+                      <div class="form-text">Time window in milliseconds for rate limiting.</div>
+                    </div>
+                  </form>
+                </div>
+                <div class="card-footer px-3 py-2">
+                  <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-secondary small"><i class="bi bi-terminal me-1"></i> Run <code>docker compose restart altcha-server</code> after saving for changes to take effect.</span>
+                    <button type="button" class="btn btn-sm btn-success" id="btn-save-pow-card"
+                      onclick="SentinelSettings.savePowSettingsFromCard()">
+                      <span id="btn-save-pow-card-text">Save Policy</span>
+                      <span id="btn-save-pow-card-spinner" class="spinner-border spinner-border-sm d-none ms-1"></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+
           </div>
         </div>
       </div>
@@ -362,44 +359,9 @@
       await SentinelSettings.init();
     });
 
-    async function handleSavePowSettings(e) {
-      e.preventDefault();
-
-      const btn = document.getElementById('btn-save-pow');
-      const btnText = document.getElementById('btn-save-pow-text');
-      const spinner = document.getElementById('btn-save-pow-spinner');
-
-      btn.disabled = true;
-      spinner.classList.remove('d-none');
-      btnText.textContent = 'Saving...';
-
-      const payload = {
-        altcha_cost: document.getElementById('input-cost').value,
-        expires_in: document.getElementById('input-expires').value,
-        rate_limit_max: document.getElementById('input-ratelimit-max').value,
-        rate_limit_window_ms: document.getElementById('input-ratelimit-window').value,
-      };
-
-      try {
-        const res = await fetch('/api/sentinel/pow-config', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'same-origin',
-          body: JSON.stringify(payload)
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-
-        SentinelApp.showToast('Configuration updated! Please restart the server for changes to take effect.', 'success');
-      } catch (err) {
-        SentinelApp.showToast('Failed to save configuration: ' + err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        spinner.classList.add('d-none');
-        btnText.textContent = 'Save Configuration';
-      }
-    }
   </script>
+
+
   <!--end::Script-->
 </body>
 <!--end::Body-->
