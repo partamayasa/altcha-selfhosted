@@ -17,6 +17,19 @@
   };
 
   const CACHE_PREFIX = 'sentinel_tpl_';
+  const TPL_VERSION = '1.0.2';
+
+  // Invalidate cache if template engine version changes
+  try {
+    if (sessionStorage.getItem('sentinel_tpl_version') !== TPL_VERSION) {
+      Object.keys(sessionStorage).forEach((k) => {
+        if (k.startsWith(CACHE_PREFIX)) {
+          sessionStorage.removeItem(k);
+        }
+      });
+      sessionStorage.setItem('sentinel_tpl_version', TPL_VERSION);
+    }
+  } catch {}
 
   function getCachedTemplate(key) {
     try {
@@ -49,18 +62,29 @@
     const cached = getCachedTemplate(url);
     if (cached) {
       // Revalidate in background to keep template up-to-date without blocking
-      fetch(url)
+      fetch(url, { cache: 'no-cache' })
         .then((r) => (r.ok ? r.text() : null))
         .then((fresh) => {
           if (fresh && fresh !== cached) {
             setCachedTemplate(url, fresh);
+            if (url.includes('footer.html')) {
+              const el = document.querySelector('footer.app-footer');
+              if (el) replaceWithHtml(el, fresh);
+            } else if (url.includes('sidebar.html')) {
+              const el = document.querySelector('aside.app-sidebar');
+              if (el) {
+                replaceWithHtml(el, fresh);
+                applyActiveMenu();
+              }
+            }
+            document.dispatchEvent(new CustomEvent('templates:loaded', { bubbles: true }));
           }
         })
         .catch(() => {});
       return cached;
     }
 
-    const response = await fetch(url);
+    const response = await fetch(url, { cache: 'no-cache' });
     if (!response.ok) {
       throw new Error(`Failed to load template from ${url} (HTTP ${response.status})`);
     }
